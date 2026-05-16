@@ -1,0 +1,13 @@
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+
+[[redirects]]
+  from = "/"
+  to = "/Croffle.html"
+  status = 200
+
+[[redirects]]
+  from = "/Croffle.html"
+  to = "/Croffle.html"
+  status = 200
