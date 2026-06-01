@@ -114,8 +114,15 @@ html,body{height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFo
   color:var(--b);border:none;background:none;outline:none;-moz-appearance:textfield}
 .oqn::-webkit-outer-spin-button,.oqn::-webkit-inner-spin-button{-webkit-appearance:none}
 .order-panel{background:#fff;border-radius:24px 24px 0 0;box-shadow:0 -4px 24px rgba(0,0,0,.18);
-  padding:14px 18px env(safe-area-inset-bottom,10px);flex-shrink:0;
-  overflow-y:auto;-webkit-overflow-scrolling:touch;max-height:62vh}
+  padding:0 18px env(safe-area-inset-bottom,10px);flex-shrink:0;
+  overflow-y:auto;-webkit-overflow-scrolling:touch;max-height:62vh;
+  transition:max-height .3s cubic-bezier(.4,0,.2,1)}
+.order-panel.collapsed{max-height:56px;overflow:hidden}
+.panel-handle{display:flex;align-items:center;justify-content:center;padding:10px 0 4px;cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+.panel-handle-bar{width:36px;height:4px;background:#ddd;border-radius:4px}
+.panel-collapse-btn{position:absolute;right:18px;top:10px;background:var(--ambl);border:none;border-radius:8px;width:32px;height:28px;font-size:.8rem;cursor:pointer;color:var(--hdr);font-weight:800;display:flex;align-items:center;justify-content:center;touch-action:manipulation}
+.panel-collapse-btn:active{background:var(--amber)}
+.panel-top{position:relative;padding-top:10px}
 .panel-sum{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
 .panel-items{font-size:.82rem;color:#888;font-weight:600}
 .panel-total{font-size:1.1rem;font-weight:800;color:var(--hdr)}
@@ -135,8 +142,53 @@ html,body{height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFo
 .confirm-btn:active{transform:scale(.98);background:#2d1505}
 .confirm-btn:disabled{background:#bbb;color:#fff;cursor:not-allowed}
 .empty-hint{text-align:center;color:#ccc;padding:5px 0 3px;font-size:.82rem}
+
+/* ══ CART DRAWER ══════════════════════ */
+#cart-drawer-bg{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:50;
+  opacity:0;pointer-events:none;transition:opacity .25s}
+#cart-drawer-bg.show{opacity:1;pointer-events:all}
+#cart-drawer{position:fixed;left:0;right:0;bottom:0;background:#fff;
+  border-radius:24px 24px 0 0;z-index:51;
+  display:flex;flex-direction:column;
+  max-height:82vh;
+  transform:translateY(100%);transition:transform .3s cubic-bezier(.4,0,.2,1);
+  padding-bottom:env(safe-area-inset-bottom,0)}
+#cart-drawer-bg.show #cart-drawer{transform:translateY(0)}
+.cart-drawer-hdr{display:flex;align-items:center;justify-content:space-between;
+  padding:16px 18px 12px;border-bottom:1px solid #f0e8d8;flex-shrink:0}
+.cart-drawer-title{font-size:1rem;font-weight:800;color:var(--hdr)}
+.cart-drawer-close{background:none;border:none;font-size:1.4rem;color:#aaa;
+  cursor:pointer;padding:0 4px;line-height:1;touch-action:manipulation}
+.cart-drawer-body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:10px 16px}
+.cart-item-row{display:flex;align-items:center;gap:10px;
+  padding:10px 0;border-bottom:1px solid #f5ebd8}
+.cart-item-row:last-child{border-bottom:none}
+.cart-item-ico{width:44px;height:44px;border-radius:10px;object-fit:cover;flex-shrink:0}
+.cart-item-info{flex:1;min-width:0}
+.cart-item-name{font-size:.88rem;font-weight:700;color:var(--hdr);line-height:1.3}
+.cart-item-sweet{font-size:.72rem;color:#aaa;margin-top:1px}
+.cart-item-price{font-size:.85rem;font-weight:700;color:var(--g);margin-top:2px}
+.cart-item-ctrl{display:flex;align-items:center;gap:0;background:#f5f5f5;border-radius:20px;overflow:hidden;flex-shrink:0}
+.cart-qb{width:32px;height:32px;border:none;background:none;font-size:1.1rem;font-weight:700;
+  color:var(--hdr);cursor:pointer;display:flex;align-items:center;justify-content:center;
+  touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+.cart-qb:active{background:var(--ambl)}
+.cart-qn{width:28px;text-align:center;font-size:.9rem;font-weight:800;color:var(--b)}
+.cart-drawer-footer{padding:12px 16px;border-top:1px solid #f0e8d8;flex-shrink:0;background:#fff}
+.cart-drawer-total{display:flex;justify-content:space-between;align-items:center;
+  margin-bottom:12px}
+.cart-drawer-total-lbl{font-size:.85rem;color:#888;font-weight:600}
+.cart-drawer-total-val{font-size:1.15rem;font-weight:800;color:var(--hdr)}
+.cart-drawer-checkout{width:100%;padding:14px;background:var(--hdr);color:var(--amber);
+  border:none;border-radius:13px;font-size:.97rem;font-weight:800;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;gap:7px;touch-action:manipulation}
+.cart-drawer-checkout:active{transform:scale(.98);background:#2d1505}
+.c-cart{cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+.c-cart:active{transform:scale(.95)}
 .c-success{display:none;position:absolute;inset:0;background:var(--hdr);z-index:10;
-  flex-direction:column;align-items:center;justify-content:center;padding:32px 24px;text-align:center}
+  flex-direction:column;align-items:center;justify-content:flex-start;
+  padding:40px 24px env(safe-area-inset-bottom,24px);text-align:center;
+  overflow-y:auto;-webkit-overflow-scrolling:touch}
 .c-success.show{display:flex}
 .sico{font-size:5rem;margin-bottom:18px;animation:pop .4s cubic-bezier(.34,1.56,.64,1)}
 @keyframes pop{from{transform:scale(0)}to{transform:scale(1)}}
@@ -186,14 +238,6 @@ html,body{height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFo
 .card{background:#fff;border-radius:14px;padding:16px;margin-bottom:12px;box-shadow:var(--shadow)}
 .ctitle{font-size:.92rem;font-weight:700;color:var(--hdr);margin-bottom:14px;
   padding-bottom:10px;border-bottom:2px solid var(--ambl);display:flex;align-items:center;gap:7px}
-.section-hdr{border-radius:10px;padding:9px 14px;margin-bottom:8px;
-  font-size:.85rem;font-weight:800;color:#fff;display:flex;align-items:center;gap:7px}
-.strip{background:var(--hdr);border-radius:14px;padding:13px 16px;margin-bottom:10px;
-  display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;box-shadow:var(--shadow)}
-.si{text-align:center}
-.sl{font-size:.62rem;color:rgba(255,255,255,.55);font-weight:700;text-transform:uppercase;letter-spacing:.4px}
-.sv{font-size:1.1rem;font-weight:800;color:var(--amber);margin-top:2px}
-.sv.grn{color:#81C784}.sv.wht{color:#fff}
 .smc{background:#fff;border-radius:13px;padding:13px 14px;margin-bottom:9px;
   display:flex;align-items:center;gap:11px;box-shadow:var(--shadow)}
 .mico{font-size:1.9rem;flex-shrink:0;line-height:1}
@@ -210,13 +254,10 @@ html,body{height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFo
 .qnum{width:46px;height:42px;border:none;background:none;text-align:center;
   font-size:1.1rem;font-weight:800;color:var(--b);outline:none;-moz-appearance:textfield}
 .qnum::-webkit-outer-spin-button,.qnum::-webkit-inner-spin-button{-webkit-appearance:none}
-.abtnrow{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
 .abtn{padding:14px 10px;border:none;border-radius:12px;font-size:.9rem;font-weight:700;
   cursor:pointer;display:flex;align-items:center;justify-content:center;gap:7px;min-height:50px;transition:all .18s}
 .abtn:active{transform:scale(.97)}
-.abtn-save{background:var(--hdr);color:var(--amber);grid-column:1/-1;font-size:1rem}
 .abtn-clr{background:#F5F5F5;color:var(--hdr)}
-.abtn-exp{background:var(--gl);color:var(--g)}
 .kgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
 .kcard{border-radius:13px;padding:16px 13px;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,.08)}
 .kico{font-size:1.5rem;display:block;margin-bottom:4px}
@@ -368,27 +409,6 @@ html,body{height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFo
   opacity:0;transition:all .3s;z-index:1000;white-space:nowrap;pointer-events:none}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 
-.pay-qr-wait-badge{display:block;text-align:center;background:#FFF8E1;color:#F57F17;
-  border-radius:10px;padding:7px 12px;font-size:.82rem;font-weight:700;margin-top:8px;
-  border:1.5px dashed #FFB300}
-/* ── Slip Upload (customer) ── */
-.slip-upload-wrap{background:rgba(255,255,255,.1);border-radius:12px;padding:10px;margin-bottom:8px}
-.slip-upload-lbl{font-size:.72rem;color:#90CAF9;font-weight:700;margin-bottom:6px;text-align:center}
-.slip-pick-btn{width:100%;padding:10px;border:2px dashed rgba(255,255,255,.35);border-radius:10px;
-  background:transparent;color:rgba(255,255,255,.8);font-size:.85rem;font-weight:700;cursor:pointer;
-  display:flex;align-items:center;justify-content:center;gap:6px}
-.slip-pick-btn:active{background:rgba(255,255,255,.1)}
-.slip-preview-wrap{position:relative;margin-top:6px}
-.slip-preview-wrap img{width:100%;max-height:160px;object-fit:contain;border-radius:8px;
-  border:2px solid rgba(255,255,255,.3)}
-.slip-rm-btn{position:absolute;top:4px;right:4px;background:rgba(0,0,0,.55);border:none;
-  color:#fff;border-radius:50%;width:24px;height:24px;font-size:.75rem;cursor:pointer;
-  display:flex;align-items:center;justify-content:center}
-/* ── Slip viewer (admin) ── */
-.slip-thumb-btn{margin-top:8px;width:100%;padding:9px;border:none;border-radius:10px;
-  background:#E8F5E9;color:#2E7D32;font-size:.82rem;font-weight:800;cursor:pointer;
-  display:flex;align-items:center;justify-content:center;gap:6px}
-.slip-thumb-btn:active{background:#C8E6C9}
 /* ── payment pills ── */
 .pay-row{display:flex;gap:10px;margin:12px 0}
 .pay-pill{flex:1;padding:13px 8px;border:2px solid #ddd;border-radius:14px;
@@ -407,10 +427,6 @@ html,body{height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFo
 .sweet-btn{border:1.5px solid #e0d0b8;border-radius:20px;padding:3px 9px;font-size:.7rem;
   font-weight:700;background:#fff;color:#999;cursor:pointer;transition:all .15s;line-height:1.4}
 .sweet-btn.active{background:var(--hdr);border-color:var(--hdr);color:#fff}
-/* ── Per-sweetness qty rows ── */
-.sweet-qty-row{width:100%;display:flex;align-items:center;justify-content:space-between;
-  padding:5px 0;border-top:1px solid #f5ebd8;gap:8px}
-.sweet-qty-lbl{font-size:.78rem;color:var(--med);font-weight:600;flex:1;white-space:nowrap}
 /* ── Per-sweetness qty rows ── */
 .sweet-qty-row{width:100%;display:flex;align-items:center;justify-content:space-between;
   padding:5px 0;border-top:1px solid #f5ebd8;gap:8px}
@@ -536,6 +552,9 @@ html,body{height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFo
 .cal-act-btn:active{opacity:.75}
 
 /* ══ IMAGE VIEWER ═════════════════════ */
+#img-viewer{display:none;position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:900;
+  align-items:center;justify-content:center;padding:16px;flex-direction:column;gap:12px}
+#img-viewer img{max-width:100%;max-height:80vh;border-radius:12px;object-fit:contain}
 .imgv-close{position:absolute;top:16px;right:16px;background:rgba(0,0,0,.55);
   color:#fff;border:none;border-radius:50%;width:36px;height:36px;font-size:1rem;
   cursor:pointer;display:flex;align-items:center;justify-content:center}
@@ -561,8 +580,8 @@ input, select, textarea {font-size: 16px !important}
 <div id="v-cust">
   <div class="c-hdr">
     <div class="c-hdr-top">
-      <div class="c-shop-name" id="secret-zone"><img src="" id="hdr-logo" style="width:36px;height:36px;border-radius:10px;object-fit:cover;vertical-align:middle;margin-right:6px"> Light Melt</div>
-      <div class="c-cart">🛒 <span id="cart-count">0</span></div>
+      <div class="c-shop-name" id="secret-zone" oncontextmenu="return false"><img src="" id="hdr-logo" style="width:36px;height:36px;border-radius:10px;object-fit:cover;vertical-align:middle;margin-right:6px"> Light Melt</div>
+      <div class="c-cart" onclick="openCartDrawer()">🛒 <span id="cart-count">0</span></div>
     </div>
     <div class="c-hdr-sub">เลือกเมนูที่ต้องการแล้วกดยืนยัน</div>
   </div>
@@ -585,23 +604,32 @@ input, select, textarea {font-size: 16px !important}
     <div class="c-list" id="c-khanom"></div>
     <div style="height:8px"></div>
   </div>
-  <div class="order-panel">
-    <div id="c-empty" class="empty-hint">👆 เลือกเมนูด้านบนเพื่อเริ่มสั่ง</div>
+  <div class="order-panel" id="order-panel">
+    <!-- handle bar กดพับ/펼 -->
+    <div class="panel-handle" onclick="togglePanelCollapse()">
+      <div class="panel-handle-bar"></div>
+    </div>
+    <div id="c-empty" class="empty-hint" style="padding-bottom:10px">👆 เลือกเมนูด้านบนเพื่อเริ่มสั่ง</div>
     <div id="c-panel" style="display:none">
-      <div class="panel-sum" onclick="toggleOD()">
-        <div>
-          <div class="panel-items" id="p-items">0 รายการ</div>
-          <button class="toggle-btn" id="p-toggle">ดูรายการ ▾</button>
+      <div class="panel-top">
+        <div class="panel-sum" onclick="toggleOD()">
+          <div>
+            <div class="panel-items" id="p-items">0 รายการ</div>
+            <button class="toggle-btn" id="p-toggle">ดูรายการ ▾</button>
+          </div>
+          <div class="panel-total" id="p-total">฿0</div>
         </div>
-        <div class="panel-total" id="p-total">฿0</div>
+        <button class="panel-collapse-btn" onclick="event.stopPropagation();togglePanelCollapse()" id="panel-collapse-btn" title="พับ/펼">▼</button>
       </div>
-      <div class="order-detail" id="order-detail"></div>
-      <input class="cname-inp" type="text" id="cust-name"
-        placeholder="ชื่อของคุณ (เช่น อ๊อฟ, มิ้น)" maxlength="30" autocomplete="off"
-        oninput="document.getElementById('confirm-btn').disabled=!this.value.trim()">
-      <input class="cname-inp" type="text" id="cust-note"
-        placeholder="หมายเหตุ / ความต้องการเพิ่มเติม (ถ้ามี)" maxlength="100" autocomplete="off" style="margin-bottom:10px">
-      <button class="confirm-btn" id="confirm-btn" onclick="confirmOrder()" disabled>✅ ยืนยันออเดอร์</button>
+      <div id="panel-form">
+        <div class="order-detail" id="order-detail"></div>
+        <input class="cname-inp" type="text" id="cust-name"
+          placeholder="ชื่อของคุณ (เช่น อ๊อฟ, มิ้น)" maxlength="30" autocomplete="off"
+          oninput="document.getElementById('confirm-btn').disabled=!this.value.trim()">
+        <input class="cname-inp" type="text" id="cust-note"
+          placeholder="หมายเหตุ / ความต้องการเพิ่มเติม (ถ้ามี)" maxlength="100" autocomplete="off" style="margin-bottom:10px">
+        <button class="confirm-btn" id="confirm-btn" onclick="confirmOrder()" disabled>✅ ยืนยันออเดอร์</button>
+      </div>
     </div>
   </div>
   <div class="c-success" id="c-success">
@@ -652,6 +680,26 @@ input, select, textarea {font-size: 16px !important}
   </div>
 </div><!-- /v-cust -->
 
+<!-- Cart Drawer -->
+<div id="cart-drawer-bg" onclick="closeCartDrawer()">
+  <div id="cart-drawer" onclick="event.stopPropagation()">
+    <div class="cart-drawer-hdr">
+      <div class="cart-drawer-title">🛒 ตะกร้าของคุณ</div>
+      <button class="cart-drawer-close" onclick="closeCartDrawer()">✕</button>
+    </div>
+    <div class="cart-drawer-body" id="cart-drawer-body"></div>
+    <div class="cart-drawer-footer">
+      <div class="cart-drawer-total">
+        <span class="cart-drawer-total-lbl">รวมทั้งหมด</span>
+        <span class="cart-drawer-total-val" id="cart-drawer-total">฿0</span>
+      </div>
+      <button class="cart-drawer-checkout" onclick="closeCartDrawer();expandPanel()">
+        ✅ ไปกรอกชื่อและยืนยัน
+      </button>
+    </div>
+  </div>
+</div>
+
 <!-- Image Viewer Overlay -->
 <div id="img-viewer" onclick="closeImgViewer()">
   <img id="img-viewer-img" src="">
@@ -667,6 +715,11 @@ input, select, textarea {font-size: 16px !important}
 
 
 
+
+<!-- hidden sq-inputs สำหรับ syncSalesFromAccepted / calcSales / updCharts -->
+<div id="s-croffle" style="display:none"></div>
+<div id="s-drink"   style="display:none"></div>
+<div id="s-khanom"  style="display:none"></div>
 
 <!-- ════════════ OWNER VIEW ════════════ -->
 <div id="v-own">
@@ -695,14 +748,10 @@ input, select, textarea {font-size: 16px !important}
       <p>4. เปิดไฟล์ <code>Croffle.html</code> ด้วย Notepad → หาบรรทัด <code>FB_CONFIG</code> → วางค่าลงไป</p>
     </div>
 
-    <!-- Screen
-
-    <!-- Screen 4: ออเดอร์ -->
+    <!-- Screen 1: ออเดอร์ -->
     <div class="screen active" id="sc-orders">
       <div id="orders-list"></div>
     </div>
-
-    <!-- Screen 5
 
     <!-- Screen 2: สรุปวันนี้ -->
     <div class="screen" id="sc-summary">
@@ -740,8 +789,6 @@ input, select, textarea {font-size: 16px !important}
       <div class="cbox"><h3>🥧 สัดส่วนกำไรแต่ละเมนู</h3><div class="ch"><canvas id="pieChart"></canvas></div></div>
     </div>
 
-    <!-- Screen 3
-
     <!-- Screen 3: ประวัติ -->
     <div class="screen" id="sc-hist">
       <div class="hstats">
@@ -754,9 +801,7 @@ input, select, textarea {font-size: 16px !important}
       <button class="abtn abtn-clr" style="width:100%;justify-content:center;margin-top:4px" onclick="clearHist()">🗑️ ลบประวัติทั้งหมด</button>
     </div>
 
-    <!-- Screen 4
-
-    <!-- Screen 5: ปฏิทินออเดอร์ -->
+    <!-- Screen 4: ปฏิทินออเดอร์ -->
     <div class="screen" id="sc-calendar">
       <!-- mini chips วันที่มีออเดอร์ -->
       <div class="cal-mini" id="cal-chips"></div>
@@ -1016,7 +1061,7 @@ input, select, textarea {font-size: 16px !important}
       <button class="pin-key pk-ok" onclick="pinConfirm()">✓</button>
     </div>
     <button class="pin-cancel" onclick="closePinDialog()">ยกเลิก</button>
-    <div class="pin-hint">รหัสเริ่มต้น: 1234</div>
+    <div class="pin-hint">รหัสเริ่มต้น: 1223</div>
   </div>
 </div>
 
@@ -1337,12 +1382,11 @@ function lockToCustomer() {
 // SHARED UTILS
 // ════════════════════════════════════════
 function fmt(n)  { return n.toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2}); }
-function fmtK(n) { return n.toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2}); }
 function fdate(s) {
   const [y,m,d] = s.split('-');
   const mn   = ['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
   const days = ['อา.','จ.','อ.','พ.','พฤ.','ศ.','ส.'];
-  return days[new Date(s).getDay()] + ' ' + (+d) + ' ' + mn[+m] + ' ' + (+y+543);
+  return days[new Date(s + 'T12:00:00').getDay()] + ' ' + (+d) + ' ' + mn[+m] + ' ' + (+y+543);
 }
 let toastT;
 function toast(msg) {
@@ -1401,9 +1445,16 @@ function selectPreorderDate(dateStr) {
 }
 
 function clearPreorder() {
-  // auto-select tomorrow (ไม่มีตัวเลือกวันนี้)
-  var tmr = new Date(); tmr.setDate(tmr.getDate()+1);
-  selectPreorderDate(localDateStr(tmr));
+  preorderDate = '';
+  buildDateChips();
+  const card     = document.getElementById('c-precard');
+  const valEl    = document.getElementById('c-precard-val');
+  const hintEl   = document.getElementById('c-precard-hint');
+  const cancelEl = document.getElementById('c-precard-cancel');
+  if (card)     card.classList.remove('preorder');
+  if (valEl)    valEl.textContent = '';
+  if (hintEl)   hintEl.style.display = '';
+  if (cancelEl) cancelEl.style.display = 'none';
 }
 
 function openImgViewer(menuId) {
@@ -1524,6 +1575,7 @@ function calcOrder() {
   const isEmpty = !totQty;
   document.getElementById('c-empty').style.display  = isEmpty ? 'block' : 'none';
   document.getElementById('c-panel').style.display  = isEmpty ? 'none'  : 'block';
+  if (!isEmpty && panelCollapsed) expandPanel();
   if (!isEmpty) {
     document.getElementById('p-items').textContent = totQty + ' รายการ';
     document.getElementById('p-total').textContent = '฿' + totRev;
@@ -1557,6 +1609,94 @@ function renderOD() {
     rows.join('') + `<div class="od-row"><span>รวมทั้งหมด</span><span>฿${totRev}</span></div>`;
 }
 let odOpen = false;
+let panelCollapsed = false;
+function togglePanelCollapse() {
+  panelCollapsed = !panelCollapsed;
+  const panel = document.getElementById('order-panel');
+  const btn   = document.getElementById('panel-collapse-btn');
+  if (panel) panel.classList.toggle('collapsed', panelCollapsed);
+  if (btn)   btn.textContent = panelCollapsed ? '▲' : '▼';
+}
+function expandPanel() {
+  panelCollapsed = false;
+  const panel = document.getElementById('order-panel');
+  const btn   = document.getElementById('panel-collapse-btn');
+  if (panel) panel.classList.remove('collapsed');
+  if (btn)   btn.textContent = '▼';
+}
+
+// ════════════════════════════════════════
+// CART DRAWER
+// ════════════════════════════════════════
+function openCartDrawer() {
+  const totQty = +document.getElementById('cart-count').textContent;
+  if (!totQty) { return; } // ตะกร้าว่าง ไม่ต้องเปิด
+  renderCartDrawer();
+  document.getElementById('cart-drawer-bg').classList.add('show');
+  document.body.style.overflow = 'hidden';
+}
+function closeCartDrawer() {
+  document.getElementById('cart-drawer-bg').classList.remove('show');
+  document.body.style.overflow = '';
+}
+function renderCartDrawer() {
+  const body = document.getElementById('cart-drawer-body');
+  const totalEl = document.getElementById('cart-drawer-total');
+  let html = '', totRev = 0;
+  MENUS.forEach(m => {
+    // รวม qty ทุก sweetness level
+    const entries = [];
+    if (m.hasSweet || m.cat === 'drink') {
+      const sufs = m.cat === 'drink' ? [['n','หวานปกติ'],['l','หวานน้อย'],['z','ไม่หวาน']] : [['n','หวานปกติ'],['l','หวานน้อย']];
+      sufs.forEach(([suf, label]) => {
+        const el = document.getElementById('oq-' + m.id + '-' + suf);
+        const q = el ? (+el.value || 0) : 0;
+        if (q > 0) entries.push({ q, label });
+      });
+    } else {
+      const el = document.getElementById('oq-' + m.id);
+      const q = el ? (+el.value || 0) : 0;
+      if (q > 0) entries.push({ q, label: '' });
+    }
+    entries.forEach(({ q, label }) => {
+      const subtotal = m.sell * q;
+      totRev += subtotal;
+      const imgSrc = IMG[m.id] || '';
+      const sweetTag = label ? `<div class="cart-item-sweet">${label}</div>` : '';
+      // ปุ่ม +/- ใช้ฟังก์ชัน chgCartQty
+      const suf = label === 'หวานน้อย' ? 'l' : label === 'ไม่หวาน' ? 'z' : label === 'หวานปกติ' ? 'n' : '';
+      const inputId = suf ? `oq-${m.id}-${suf}` : `oq-${m.id}`;
+      html += `<div class="cart-item-row">
+        <img class="cart-item-ico" src="${imgSrc}" onerror="this.style.display='none'">
+        <div class="cart-item-info">
+          <div class="cart-item-name">${m.ico} ${m.name}</div>
+          ${sweetTag}
+          <div class="cart-item-price">฿${subtotal}</div>
+        </div>
+        <div class="cart-item-ctrl">
+          <button class="cart-qb" onclick="chgCartQty('${inputId}',-1)">−</button>
+          <span class="cart-qn">${q}</span>
+          <button class="cart-qb" onclick="chgCartQty('${inputId}',+1)">+</button>
+        </div>
+      </div>`;
+    });
+  });
+  if (!html) html = '<div style="text-align:center;color:#ccc;padding:32px 0;font-size:.9rem">ยังไม่มีสินค้าในตะกร้า</div>';
+  body.innerHTML = html;
+  if (totalEl) totalEl.textContent = '฿' + totRev;
+}
+function chgCartQty(inputId, delta) {
+  const el = document.getElementById(inputId);
+  if (!el) return;
+  const newVal = Math.max(0, (+el.value || 0) + delta);
+  el.value = newVal;
+  calcOrder();
+  // ถ้าตะกร้าว่างให้ปิด drawer
+  const totQty = +document.getElementById('cart-count').textContent;
+  if (!totQty) { closeCartDrawer(); return; }
+  renderCartDrawer(); // re-render
+}
+
 function toggleOD() {
   odOpen = !odOpen;
   document.getElementById('order-detail').classList.toggle('open', odOpen);
@@ -1970,9 +2110,9 @@ function calcSales() {
     if (_spEl) _spEl.textContent = 'กำไร ฿' + g.toFixed(2);
   });
   const pct = totR > 0 ? totG/totR*100 : 0;
-  var _tr=document.getElementById('t-r'); if(_tr) _tr.textContent='฿'+fmtK(totR);
-  var _tc=document.getElementById('t-c'); if(_tc) _tc.textContent='฿'+fmtK(totC);
-  var _tg=document.getElementById('t-g'); if(_tg) _tg.textContent='฿'+fmtK(totG);
+  var _tr=document.getElementById('t-r'); if(_tr) _tr.textContent='฿'+fmt(totR);
+  var _tc=document.getElementById('t-c'); if(_tc) _tc.textContent='฿'+fmt(totC);
+  var _tg=document.getElementById('t-g'); if(_tg) _tg.textContent='฿'+fmt(totG);
   document.getElementById('k-r').textContent = '฿' + fmt(totR);
   document.getElementById('k-c').textContent = '฿' + fmt(totC);
   document.getElementById('k-g').textContent = '฿' + fmt(totG);
@@ -2079,10 +2219,13 @@ function initCharts() {
   });
 }
 function updCharts() {
+  const _today = (document.getElementById('dateInput') && document.getElementById('dateInput').value) || localDateStr();
   const revs=[],costs=[],profits=[];
   MENUS.forEach(m=>{
-    const q=+document.getElementById('sq-'+m.id).value||0;
-    revs.push(m.sell*q); costs.push(m.cost*q); profits.push((m.sell-m.cost)*q);
+    const el = document.getElementById('sq-'+m.id);
+    const q = el ? (+el.value||0) : 0;
+    const c = getDailyCost(m.id, _today);
+    revs.push(m.sell*q); costs.push(c*q); profits.push((m.sell-c)*q);
   });
   barC.data.datasets[0].data=revs; barC.data.datasets[1].data=costs; barC.data.datasets[2].data=profits;
   barC.update('none');
@@ -2151,8 +2294,8 @@ function deleteEntry(date) {
 function renderHist() {
   const hist=getHist();
   document.getElementById('hs-d').textContent=hist.length;
-  document.getElementById('hs-r').textContent='฿'+fmtK(hist.reduce((s,h)=>s+h.totRev,0));
-  document.getElementById('hs-g').textContent='฿'+fmtK(hist.reduce((s,h)=>s+h.totGp,0));
+  document.getElementById('hs-r').textContent='฿'+fmt(hist.reduce((s,h)=>s+h.totRev,0));
+  document.getElementById('hs-g').textContent='฿'+fmt(hist.reduce((s,h)=>s+h.totGp,0));
   const list=document.getElementById('hist-list');
   if(!hist.length){list.innerHTML=`<div class="empty">📭 ยังไม่มีข้อมูล</div>`;return;}
   list.innerHTML=hist.map(h=>{
@@ -3185,8 +3328,12 @@ window.onload = () => {
   document.getElementById('dateInput').value = today;
   onDate(today);
   initFirebase();
-  // โหลด history หลัง Firebase พอ connect — รอ 3 วิเพื่อให้ listener ยิงก่อน
-  setTimeout(loadOrderHistory, 3000);
+  // โหลด history ทันทีที่ Firebase connect (ไม่ hardcode delay)
+  if (db) {
+    db.ref('.info/connected').once('value', () => loadOrderHistory());
+  } else {
+    setTimeout(loadOrderHistory, 500);
+  }
 };
 
 // ════════════════════════════════════════
