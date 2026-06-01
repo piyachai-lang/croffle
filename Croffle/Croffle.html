@@ -795,8 +795,6 @@ input, select, textarea {font-size: 16px !important}
         </div>
         <div id="breakdown"></div>
       </div>
-      <div class="cbox"><h3>📊 รายรับ / ต้นทุน / กำไร แยกเมนู</h3><div class="ch"><canvas id="barChart"></canvas></div></div>
-      <div class="cbox"><h3>🥧 สัดส่วนกำไรแต่ละเมนู</h3><div class="ch"><canvas id="pieChart"></canvas></div></div>
     </div>
 
     <!-- Screen 3: ประวัติ -->
@@ -2154,29 +2152,9 @@ function calcSales() {
     var _spEl = document.getElementById('sptag-' + m.id);
     if (_spEl) _spEl.textContent = 'กำไร ฿' + g.toFixed(2);
   });
-  const pct = totR > 0 ? totG/totR*100 : 0;
-  var _tr=document.getElementById('t-r'); if(_tr) _tr.textContent='฿'+fmt(totR);
-  var _tc=document.getElementById('t-c'); if(_tc) _tc.textContent='฿'+fmt(totC);
-  var _tg=document.getElementById('t-g'); if(_tg) _tg.textContent='฿'+fmt(totG);
-  document.getElementById('k-r').textContent = '฿' + fmt(totR);
-  document.getElementById('k-c').textContent = '฿' + fmt(totC);
-  document.getElementById('k-g').textContent = '฿' + fmt(totG);
-  document.getElementById('k-p').textContent = pct.toFixed(1) + '%';
-  document.getElementById('k-b').textContent = totB;
-  var _bdEl = document.getElementById('breakdown');
-  if (_bdEl) _bdEl.innerHTML = MENUS.map(m => {
-    var _sqEl2 = document.getElementById('sq-' + m.id);
-    const q = _sqEl2 ? (+_sqEl2.value || 0) : 0;
-    const r = m.sell*q, g = r - getDailyCost(m.id, _today)*q, p = r > 0 ? g/r*100 : 0;
-    const pc = p>=55?'var(--g)':p>=35?'var(--med)':'var(--r)';
-    return `<div class="brow">
-      <div class="bname"><img src="${IMG[m.id]||''}" style="width:22px;height:22px;object-fit:cover;border-radius:5px;vertical-align:middle;margin-right:5px" onerror="this.remove()">${m.name}</div>
-      <div class="bqty">${q}</div>
-      <div class="bgp">฿${g.toFixed(2)}</div>
-      <div class="bpct" style="color:${pc}">${r>0?p.toFixed(0)+'%':'—'}</div>
-    </div>`;
-  }).join('');
-  if (chartsReady) updCharts();
+  // ✅ calcSales() ไม่เขียนทับ Summary KPIs (#k-r ฯลฯ) อีกต่อไป
+  // Summary KPIs ถูก manage โดย renderSummaryFromQtys() เท่านั้น
+  // ป้องกันการเขียนทับค่า week/month ที่ถูกต้องด้วยค่า sq-input ที่อาจล้าสมัย
 
 }
 
@@ -2203,16 +2181,17 @@ function tab(t) {
     if(nb) nb.classList.toggle('active', x===t);
   });
   if (t === 'summary') {
-    loadOrderHistory();      // ensure orderHistoryCache is up-to-date
-    syncSalesFromAccepted(); // sync sq-inputs ก่อนทุกครั้ง
-    syncCrHistFromCache();   // sync crHist จาก orderHistoryCache
+    loadOrderHistory();    // ensure orderHistoryCache is up-to-date (async)
+    syncCrHistFromCache(); // sync crHist จาก orderHistoryCache
+    // ✅ ไม่เรียก syncSalesFromAccepted() + calcSales() ที่จะเขียนทับ Summary KPIs ด้วยค่าผิด
     if (summaryMode === 'month') {
       if (!summaryMonthStr) summaryMonthStr = localDateStr().slice(0,7);
       setSumMode('month');
+    } else if (summaryMode === 'week') {
+      loadSummaryWeek(summaryWeekStart || summaryDateStr || localDateStr());
     } else {
       if (!summaryDateStr) summaryDateStr = localDateStr();
       loadSummaryDate(summaryDateStr);
-      if (chartsReady) updCharts();
     }
   }
   if (t === 'hist')    { syncCrHistFromCache(); renderHist(); updWeekChart(); }
@@ -2227,30 +2206,8 @@ function tab(t) {
   }
 }
 
-// ── Charts ──────────────────────────────────────────────
+// ── Charts (weekC only — bar/pie removed from Summary tab) ──
 function initCharts() {
-  barC = new Chart(document.getElementById('barChart'), {
-    type:'bar',
-    data:{labels:MENUS.map(m=>m.name),datasets:[
-      {label:'รายรับ',data:MENUS.map(()=>0),backgroundColor:'#4472C4CC'},
-      {label:'ต้นทุน',data:MENUS.map(()=>0),backgroundColor:'#ED7D31CC'},
-      {label:'กำไร', data:MENUS.map(()=>0),backgroundColor:'#70AD47CC'},
-    ]},
-    options:{responsive:true,maintainAspectRatio:false,
-      plugins:{legend:{position:'bottom',labels:{font:{size:10},boxWidth:12}}},
-      scales:{x:{grid:{display:false},ticks:{font:{size:9}}},
-              y:{beginAtZero:true,ticks:{callback:v=>'฿'+v,font:{size:9}}}}}
-  });
-  pieC = new Chart(document.getElementById('pieChart'), {
-    type:'doughnut',
-    data:{labels:MENUS.map(m=>m.ico+' '+m.name),
-      datasets:[{data:MENUS.map(()=>1),
-        backgroundColor:['#4472C4','#ED7D31','#70AD47','#F5A623','#00695C'],
-        borderWidth:2,borderColor:'#fff'}]},
-    options:{responsive:true,maintainAspectRatio:false,
-      plugins:{legend:{position:'bottom',labels:{font:{size:10},boxWidth:12}},
-               tooltip:{callbacks:{label:c=>' ฿'+c.parsed.toFixed(2)}}}}
-  });
   weekC = new Chart(document.getElementById('weekChart'), {
     type:'bar',
     data:{labels:[],datasets:[
@@ -2263,21 +2220,7 @@ function initCharts() {
               y:{beginAtZero:true,ticks:{callback:v=>'฿'+v,font:{size:9}}}}}
   });
 }
-function updCharts() {
-  const _today = (document.getElementById('dateInput') && document.getElementById('dateInput').value) || localDateStr();
-  const revs=[],costs=[],profits=[];
-  MENUS.forEach(m=>{
-    const el = document.getElementById('sq-'+m.id);
-    const q = el ? (+el.value||0) : 0;
-    const c = getDailyCost(m.id, _today);
-    revs.push(m.sell*q); costs.push(c*q); profits.push((m.sell-c)*q);
-  });
-  barC.data.datasets[0].data=revs; barC.data.datasets[1].data=costs; barC.data.datasets[2].data=profits;
-  barC.update('none');
-  const hasPr=profits.some(p=>p>0);
-  pieC.data.datasets[0].data=hasPr?profits.map(p=>Math.max(p,0)):MENUS.map(()=>1);
-  pieC.update('none');
-}
+function updCharts() { /* bar/pie charts removed — no-op */ }
 function updWeekChart() {
   const hist=getHist(), last7=hist.slice(0,7).reverse();
   weekC.data.labels=last7.map(h=>{const[,m,d]=h.date.split('-');return`${+d}/${+m}`;});
@@ -3295,6 +3238,16 @@ function clearAccepted() {
     acceptedCache = [];
     localStorage.setItem('crAcceptedOrders', JSON.stringify([]));
     renderOrders();
+    // ✅ sync sq-inputs และ refresh Summary/Calendar หลังล้าง
+    syncSalesFromAccepted();
+    var scSum = document.getElementById('sc-summary');
+    if (scSum && scSum.classList.contains('active')) {
+      if (summaryMode === 'month') loadSummaryMonth(summaryMonthStr);
+      else if (summaryMode === 'week') loadSummaryWeek(summaryWeekStart || summaryDateStr);
+      else loadSummaryDate(summaryDateStr || localDateStr());
+    }
+    var scCal = document.getElementById('sc-calendar');
+    if (scCal && scCal.classList.contains('active')) renderCalendar();
     toast('🗑️ ล้างออเดอร์ที่รับแล้วทั้งหมด');
   }, '🗑️ ล้างทั้งหมด', 'กลับ');
 }
@@ -4042,22 +3995,6 @@ function renderSummaryFromQtys(qtys, totR, totC, totG, totB, itemRevMap, itemCos
     }).join('');
   }
 
-  if (chartsReady) {
-    barC.data.datasets[0].data = MENUS.map(function(m){ return itemRevMap  ? (itemRevMap[m.id]||0)  : m.sell*(qtys[m.id]||0); });
-    barC.data.datasets[1].data = MENUS.map(function(m){ return itemCostMap ? (itemCostMap[m.id]||0) : m.cost*(qtys[m.id]||0); });
-    barC.data.datasets[2].data = MENUS.map(function(m){
-      var r = itemRevMap  ? (itemRevMap[m.id]||0)  : m.sell*(qtys[m.id]||0);
-      var c = itemCostMap ? (itemCostMap[m.id]||0) : m.cost*(qtys[m.id]||0);
-      return r - c;
-    });
-    barC.update();
-    pieC.data.datasets[0].data = MENUS.map(function(m){
-      var r = itemRevMap  ? (itemRevMap[m.id]||0)  : m.sell*(qtys[m.id]||0);
-      var c = itemCostMap ? (itemCostMap[m.id]||0) : m.cost*(qtys[m.id]||0);
-      return Math.max(0, r - c);
-    });
-    pieC.update();
-  }
 }
 
 let summaryMode = 'day'; // 'day' | 'month'
@@ -4146,16 +4083,43 @@ function loadSummaryWeek(anyDateStr) {
     });
     var dayNames=['อา.','จ.','อ.','พ.','พฤ.','ศ.','ส.'];
     var dObj=new Date(ds+'T12:00:00');
-    var dGp=dR-dC;
-    if(dB>0) weekRows += '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 14px;border-bottom:1px solid #F0E8D8;font-size:.82rem">'
-      +'<div style="color:var(--hdr);font-weight:700;min-width:80px">'+dayNames[dObj.getDay()]+' '+fmtD(ds)+'</div>'
-      +'<div style="color:#2E7D32;font-weight:700">฿'+fmt(dR)+'</div>'
-      +'<div style="color:#888">฿'+fmt(dC)+'</div>'
-      +'<div style="color:'+(dGp>=0?'#43A047':'#E53935')+'">฿'+fmt(dGp)+'</div>'
-      +'</div>';
-    else weekRows += '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 14px;border-bottom:1px solid #F0E8D8;font-size:.82rem;opacity:.4">'
-      +'<div style="color:var(--hdr);min-width:80px">'+dayNames[dObj.getDay()]+' '+fmtD(ds)+'</div>'
-      +'<div>—</div><div>—</div><div>—</div></div>';
+    var dGp=dR-dC, dPct=dR>0?dGp/dR*100:0;
+    var isToday=ds===localDateStr();
+    if(dB>0) {
+      var gpColor=dGp>=0?'#2E7D32':'#C62828';
+      var pctColor=dPct>=40?'#2E7D32':dPct>=20?'#E65100':'#C62828';
+      // progress bar width based on margin %
+      var barW=Math.max(0,Math.min(100,dPct)).toFixed(0);
+      weekRows += '<div onclick="tab(\'summary\');setSumMode(\'day\');loadSummaryDate(\''+ds+'\')" '
+        +'style="padding:10px 14px;border-bottom:1px solid #F0E8D8;cursor:pointer;background:'+(isToday?'#FFFDE7':'#fff')+';transition:background .15s" '
+        +'onmouseover="this.style.background=\'#FFF8F0\'" onmouseout="this.style.background=\''+(isToday?'#FFFDE7':'#fff')+'\'">'
+        // Row 1: วัน + ยอดรวม
+        +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">'
+        +'<div style="display:flex;align-items:center;gap:6px">'
+        +(isToday?'<span style="background:var(--amber);color:var(--hdr);border-radius:4px;padding:1px 6px;font-size:.62rem;font-weight:800">วันนี้</span>':'')
+        +'<span style="font-size:.88rem;font-weight:800;color:var(--hdr)">'+dayNames[dObj.getDay()]+' '+fmtD(ds)+'</span>'
+        +'<span style="font-size:.72rem;color:#aaa">'+dB+' รายการ</span>'
+        +'</div>'
+        +'<span style="font-size:.95rem;font-weight:800;color:#2E7D32">฿'+fmt(dR)+'</span>'
+        +'</div>'
+        // Row 2: ต้นทุน + กำไร + %
+        +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">'
+        +'<span style="font-size:.75rem;color:#888">ต้นทุน <b style="color:#E65100">฿'+fmt(dC)+'</b></span>'
+        +'<span style="font-size:.75rem;color:#888">กำไร <b style="color:'+gpColor+'">฿'+fmt(dGp)+'</b> '
+        +'<span style="background:'+(dPct>=40?'#E8F5E9':dPct>=20?'#FFF3E0':'#FFEBEE')+';color:'+pctColor+';border-radius:4px;padding:1px 6px;font-size:.65rem;font-weight:700">'+dPct.toFixed(1)+'%</span>'
+        +'</span>'
+        +'</div>'
+        // Row 3: progress bar
+        +'<div style="height:4px;background:#F0E8D8;border-radius:4px;overflow:hidden">'
+        +'<div style="height:100%;width:'+barW+'%;background:'+(dPct>=40?'#2E7D32':dPct>=20?'#FFA000':'#C62828')+';border-radius:4px;transition:width .4s"></div>'
+        +'</div>'
+        +'</div>';
+    } else {
+      weekRows += '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 14px;border-bottom:1px solid #F0E8D8;opacity:.35">'
+        +'<span style="font-size:.82rem;font-weight:600;color:var(--hdr)">'+dayNames[dObj.getDay()]+' '+fmtD(ds)+'</span>'
+        +'<span style="font-size:.8rem;color:#aaa">ไม่มีออเดอร์</span>'
+        +'</div>';
+    }
   });
   var breakdownRows = Object.values(breakdownMap).filter(function(r){return r.qty>0;}).sort(function(a,b){
     var ma=_menuIdx[a.id]!==undefined?_menuIdx[a.id]:999;
@@ -4165,9 +4129,10 @@ function loadSummaryWeek(anyDateStr) {
     var sb=_sweetOrd[b.sweet]!==undefined?_sweetOrd[b.sweet]:3;
     return sa-sb;
   });
-  var header = '<div style="display:flex;justify-content:space-between;padding:6px 14px;background:var(--hdr);font-size:.72rem;font-weight:700;color:var(--amber)">'
-    +'<div style="min-width:80px">วัน</div><div>รายรับ</div><div>ต้นทุน</div><div>กำไร</div></div>';
-  if (weekMonList) { weekMonList.style.display='block'; weekMonList.innerHTML = header + weekRows; }
+  var header = '<div style="padding:8px 14px;background:var(--hdr);font-size:.72rem;font-weight:700;color:var(--amber);display:flex;justify-content:space-between;align-items:center">'
+    +'<span>📅 รายวัน (กดเพื่อดูสรุป)</span>'
+    +'<span style="font-size:.65rem;opacity:.7">กำไร/รายรับ</span></div>';
+  if (weekMonList) { weekMonList.style.display='block'; weekMonList.innerHTML = header + (weekRows||'<div style="text-align:center;color:#ccc;padding:20px;font-size:.85rem">ไม่มีออเดอร์สัปดาห์นี้</div>'); }
   renderSummaryFromQtys(qtys, totR, totC, totR-totC, totB, itemRevMap, itemCostMap, breakdownRows);
 }
 
