@@ -1200,6 +1200,40 @@ function initFirebase() {
       }
     });
 
+    // ── OrderHistory (real-time) — ทุกเครื่องรู้ทันทีเมื่อ order ถูกเพิ่ม/ลบ/แก้ไข ──
+    db.ref('croffle/orderHistory').on('value', function(snap) {
+      const fbHist = (snap && snap.val()) || {};
+      // Firebase คือ source of truth — สร้าง cache ใหม่จาก Firebase ล้วนๆ
+      const newCache = {};
+      Object.keys(fbHist).forEach(function(k) {
+        if (fbHist[k] && typeof fbHist[k] === 'object') newCache[k] = fbHist[k];
+      });
+      // เก็บ accepted orders ที่ยังอยู่ใน acceptedCache ด้วย (pending delivery)
+      acceptedCache.forEach(function(o) { if (o && o.id) newCache[o.id] = o; });
+      // เก็บ manual summary entries (isSummary:true) ที่มาจาก saveDay เท่านั้น
+      Object.values(orderHistoryCache).forEach(function(o) {
+        if (o && o.isSummary && !newCache[o.id]) newCache[o.id] = o;
+      });
+      orderHistoryCache = newCache;
+      // ซิงค์ localStorage ให้ตรงกับ Firebase (ลบ order ที่ถูกลบออก)
+      localStorage.setItem('crOrderHistory', JSON.stringify(newCache));
+      // recalculate crHist ทุกวัน
+      syncCrHistFromCache();
+      // refresh แท็บที่เปิดอยู่
+      var vOwn = document.getElementById('v-own');
+      if (!vOwn || vOwn.style.display === 'none') return;
+      var scCal  = document.getElementById('sc-calendar');
+      var scSum  = document.getElementById('sc-summary');
+      var scHist = document.getElementById('sc-hist');
+      if (scCal  && scCal.classList.contains('active'))  renderCalendar();
+      if (scSum  && scSum.classList.contains('active'))  {
+        if (summaryMode === 'month') loadSummaryMonth(summaryMonthStr);
+        else if (summaryMode === 'week') loadSummaryWeek(summaryWeekStart || summaryDateStr);
+        else loadSummaryDate(summaryDateStr || localDateStr());
+      }
+      if (scHist && scHist.classList.contains('active')) { renderHist(); updWeekChart(); }
+    });
+
     // ── Menu Status per-item (real-time) ──
     db.ref('croffle/menuStatus').on('value', function(snap) {
       menuStatus = snap.val() || {};
@@ -3423,20 +3457,15 @@ function saveOrderHistory(ord) {
 }
 
 function loadOrderHistory() {
-  // ═══ SYNC: build ทันทีจาก localStorage + in-memory cache ═══
-  const localHist = JSON.parse(localStorage.getItem('crOrderHistory') || '{}');
-  const localAcc  = JSON.parse(localStorage.getItem('crAcceptedOrders') || '[]');
-  const combined  = {...localHist};
-  localAcc.forEach(o   => { if (o && o.id) combined[o.id] = o; });
-  acceptedCache.forEach(o => { if (o && o.id) combined[o.id] = o; });
-  importHistSummaries(combined);
-  orderHistoryCache = combined;
-  localStorage.setItem('crOrderHistory', JSON.stringify(combined));
-  syncCrHistFromCache(); // ← sync ออเดอร์ → crHist ให้แท็บประวัติเห็น
+  // ═══ SYNC: render ทันทีด้วย in-memory cache (ที่ real-time listener update แล้ว) ═══
+  // ไม่ restore จาก localStorage อีกต่อไป เพื่อป้องกัน order ที่ลบแล้วกลับมา
+  importHistSummaries(orderHistoryCache);
+  syncCrHistFromCache();
+  renderCalendar();
 
-  renderCalendar(); // ← render ทันทีด้วย local data
-
-  // ═══ ASYNC: ดึง Firebase แล้ว re-render ═══
+  // ═══ ASYNC: force-refresh จาก Firebase (source of truth) ═══
+  // real-time listener จะ handle updates โดยอัตโนมัติ
+  // loadOrderHistory() ใช้สำหรับ initial load หรือ manual refresh เท่านั้น
   if (fbReady && db) {
     Promise.all([
       db.ref('croffle/orderHistory').once('value'),
@@ -3445,17 +3474,34 @@ function loadOrderHistory() {
       const histSnap = snaps[0], accSnap = snaps[1];
       const fbHist = (histSnap && histSnap.exists() && histSnap.val()) || {};
       const fbAcc  = (accSnap  && accSnap.exists()  && accSnap.val())  || {};
-      const merged = Object.assign({}, orderHistoryCache, fbAcc, fbHist);
-      importHistSummaries(merged); // sync crHist ด้วยหลัง Firebase
-      orderHistoryCache = merged;
-      localStorage.setItem('crOrderHistory', JSON.stringify(merged));
-      syncCrHistFromCache(); // ← sync ออเดอร์ Firebase → crHist ให้แท็บประวัติเห็น
-      // migrate accepted → orderHistory (ครั้งเดียว)
+
+      // ✅ Firebase wins: สร้าง cache ใหม่จาก Firebase ล้วนๆ (ไม่ merge กับ stale local)
+      const newCache = {};
+      Object.keys(fbHist).forEach(function(k) {
+        if (fbHist[k] && typeof fbHist[k] === 'object') newCache[k] = fbHist[k];
+      });
+      Object.keys(fbAcc).forEach(function(k) {
+        if (fbAcc[k] && typeof fbAcc[k] === 'object') newCache[k] = fbAcc[k];
+      });
+      // คง manual summary (isSummary:true) ที่สร้างจาก saveDay() ไว้
+      Object.values(orderHistoryCache).forEach(function(o) {
+        if (o && o.isSummary && !newCache[o.id]) newCache[o.id] = o;
+      });
+
+      importHistSummaries(newCache);
+      orderHistoryCache = newCache;
+      // ✅ sync localStorage ให้ตรงกับ Firebase — ลบ order ที่ไม่มีใน Firebase ออก
+      localStorage.setItem('crOrderHistory', JSON.stringify(newCache));
+      localStorage.setItem('crAcceptedOrders', JSON.stringify(acceptedCache));
+
+      syncCrHistFromCache();
+      renderCalendar();
+
+      // migrate accepted → orderHistory (ครั้งเดียว สำหรับข้อมูลเก่า)
       Object.values(fbAcc).forEach(function(o) {
         if (o && o.id && !fbHist[o.id]) db.ref('croffle/orderHistory/' + o.id).set(o);
       });
-      renderCalendar(); // re-render พร้อม Firebase data
-    }).catch(function() { /* keep local render */ });
+    }).catch(function() { /* keep current render */ });
   }
 }
 function getOrdersByDate(dateStr) {
@@ -3819,11 +3865,25 @@ function updateHistFromOrders(dateStr) {
 // sync orderHistoryCache → crHist สำหรับทุกวันที่มีออเดอร์จริง (ไม่ใช่ synthetic)
 // เรียกหลัง loadOrderHistory เสร็จ เพื่อให้แท็บประวัติเห็นข้อมูลจาก Firebase
 function syncCrHistFromCache() {
-  const dates = new Set();
+  // วันที่มี real orders อยู่ใน cache
+  const activeDates = new Set();
   Object.values(orderHistoryCache).forEach(function(o) {
-    if (o && !o.isSummary && o.date) dates.add(o.date.slice(0,10));
+    if (o && !o.isSummary && o.date) activeDates.add(o.date.slice(0,10));
   });
-  dates.forEach(function(d) { updateHistFromOrders(d); });
+  // recalculate crHist สำหรับวันที่ยังมี orders
+  activeDates.forEach(function(d) { updateHistFromOrders(d); });
+
+  // ✅ ลบ crHist entry ที่เป็น fromOrders:true แต่ไม่มี order ใน cache แล้ว
+  // (เกิดเมื่อ order ถูกลบบนเครื่องอื่น แล้ว real-time listener sync มา)
+  var hist = getHist();
+  var cleaned = hist.filter(function(h) {
+    if (h.fromOrders === false) return true; // manual saveDay — ไม่แตะ
+    return activeDates.has(h.date); // fromOrders:true — เก็บเฉพาะวันที่มี order จริง
+  });
+  if (cleaned.length !== hist.length) {
+    saveHist(cleaned); // บันทึกเฉพาะเมื่อมีการเปลี่ยนแปลง
+  }
+
   if (document.getElementById('sc-hist') &&
       document.getElementById('sc-hist').classList.contains('active')) {
     renderHist();
