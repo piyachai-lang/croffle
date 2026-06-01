@@ -1210,10 +1210,8 @@ function initFirebase() {
       });
       // เก็บ accepted orders ที่ยังอยู่ใน acceptedCache ด้วย (pending delivery)
       acceptedCache.forEach(function(o) { if (o && o.id) newCache[o.id] = o; });
-      // เก็บ manual summary entries (isSummary:true) ที่มาจาก saveDay เท่านั้น
-      Object.values(orderHistoryCache).forEach(function(o) {
-        if (o && o.isSummary && !newCache[o.id]) newCache[o.id] = o;
-      });
+      // ✅ สร้าง synthetic entries ใหม่สดจาก crHist สำหรับวันที่ไม่มี real orders
+      importHistSummaries(newCache);
       orderHistoryCache = newCache;
       // ซิงค์ localStorage ให้ตรงกับ Firebase (ลบ order ที่ถูกลบออก)
       localStorage.setItem('crOrderHistory', JSON.stringify(newCache));
@@ -2627,12 +2625,15 @@ function customConfirm(msg, onYes, labelYes, labelNo) {
 }
 
 // ── resolveItemCost: เลือกต้นทุนที่ถูกต้องสำหรับ item ──────────────────
-// Priority: 1) daily cost override (ตั้งโดยเจ้าของ) 2) stored it.cost 3) MENUS default
+// ✅ Priority: 1) stored it.cost (ต้นทุน ณ เวลาที่สั่ง — source of truth)
+//             2) daily cost override (ใช้เมื่อ item เก่าไม่มี cost บันทึกไว้)
+//             3) MENUS default
+// เหตุผล: ป้องกัน daily override เปลี่ยนตัวเลขย้อนหลังของ order เก่า
 function resolveItemCost(it, dateStr) {
+  if (it.cost != null && it.cost !== 0) return +it.cost; // ต้นทุน ณ เวลาสั่ง
   if (dailyCostOverrides[dateStr] && dailyCostOverrides[dateStr][it.id] != null) {
     return +dailyCostOverrides[dateStr][it.id];
   }
-  if (it.cost != null) return +it.cost;
   var m = MENUS.find(function(x){ return x.id === it.id; });
   return m ? m.cost : 0;
 }
@@ -3485,10 +3486,7 @@ function loadOrderHistory() {
       Object.keys(fbAcc).forEach(function(k) {
         if (fbAcc[k] && typeof fbAcc[k] === 'object') newCache[k] = fbAcc[k];
       });
-      // คง manual summary (isSummary:true) ที่สร้างจาก saveDay() ไว้
-      Object.values(orderHistoryCache).forEach(function(o) {
-        if (o && o.isSummary && !newCache[o.id]) newCache[o.id] = o;
-      });
+      // ✅ ไม่ carry-over isSummary entries เก่า — importHistSummaries() สร้างใหม่สดเสมอ
 
       importHistSummaries(newCache);
       orderHistoryCache = newCache;
@@ -3508,7 +3506,7 @@ function loadOrderHistory() {
 }
 function getOrdersByDate(dateStr) {
   return Object.values(orderHistoryCache)
-    .filter(o => (o.date||'').slice(0,10) === dateStr)
+    .filter(o => !o.isSummary && (o.date||'').slice(0,10) === dateStr) // ✅ กรอง synthetic entries
     .sort((a,b) => (a.acceptedTs||0) - (b.acceptedTs||0));
 }
 
@@ -3547,8 +3545,8 @@ function renderCalendar() {
   if (!document.getElementById('sc-calendar')) return;
   // merge acceptedCache ล่าสุดเสมอ (ป้องกันกรณี async ยังไม่เสร็จ)
   acceptedCache.forEach(function(o) { if (o && o.id) orderHistoryCache[o.id] = o; });
-  // sync crHist → orderHistoryCache (วันที่บันทึกจากแท็บสรุป/ประวัติ)
-  importHistSummaries(orderHistoryCache);
+  // ✅ ไม่เรียก importHistSummaries() ใน render loop แล้ว — ป้องกัน synthetic entries สะสม
+  // importHistSummaries ถูกเรียกใน loadOrderHistory() และ real-time listener แทน
   const d = new Date(calDate + 'T00:00:00');
   const today = new Date().toISOString().slice(0,10);
   const dayNames = ['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัส','ศุกร์','เสาร์'];
@@ -3801,9 +3799,8 @@ function cleanCrHistForDate(dateStr) {
 
 function updateHistFromOrders(dateStr) {
   const ords = Object.values(orderHistoryCache)
-    .filter(o => (o.date || '').slice(0,10) === dateStr);
+    .filter(o => !o.isSummary && (o.date || '').slice(0,10) === dateStr); // ✅ กรอง synthetic
   if (!ords.length) {
-    // ไม่มีออเดอร์ใน cache → ไม่แตะ crHist
     return;
   }
   // ✅ FIX: ใช้ราคาที่บันทึกไว้ใน item (it.sell, it.cost) ไม่ใช่ MENUS ปัจจุบัน
