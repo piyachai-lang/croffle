@@ -142,6 +142,49 @@ html,body{height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFo
 .confirm-btn:active{transform:scale(.98);background:#2d1505}
 .confirm-btn:disabled{background:#bbb;color:#fff;cursor:not-allowed}
 .empty-hint{text-align:center;color:#ccc;padding:5px 0 3px;font-size:.82rem}
+
+/* ══ CART DRAWER ══════════════════════ */
+#cart-drawer-bg{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:50;
+  opacity:0;pointer-events:none;transition:opacity .25s}
+#cart-drawer-bg.show{opacity:1;pointer-events:all}
+#cart-drawer{position:fixed;left:0;right:0;bottom:0;background:#fff;
+  border-radius:24px 24px 0 0;z-index:51;
+  display:flex;flex-direction:column;
+  max-height:82vh;
+  transform:translateY(100%);transition:transform .3s cubic-bezier(.4,0,.2,1);
+  padding-bottom:env(safe-area-inset-bottom,0)}
+#cart-drawer-bg.show #cart-drawer{transform:translateY(0)}
+.cart-drawer-hdr{display:flex;align-items:center;justify-content:space-between;
+  padding:16px 18px 12px;border-bottom:1px solid #f0e8d8;flex-shrink:0}
+.cart-drawer-title{font-size:1rem;font-weight:800;color:var(--hdr)}
+.cart-drawer-close{background:none;border:none;font-size:1.4rem;color:#aaa;
+  cursor:pointer;padding:0 4px;line-height:1;touch-action:manipulation}
+.cart-drawer-body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:10px 16px}
+.cart-item-row{display:flex;align-items:center;gap:10px;
+  padding:10px 0;border-bottom:1px solid #f5ebd8}
+.cart-item-row:last-child{border-bottom:none}
+.cart-item-ico{width:44px;height:44px;border-radius:10px;object-fit:cover;flex-shrink:0}
+.cart-item-info{flex:1;min-width:0}
+.cart-item-name{font-size:.88rem;font-weight:700;color:var(--hdr);line-height:1.3}
+.cart-item-sweet{font-size:.72rem;color:#aaa;margin-top:1px}
+.cart-item-price{font-size:.85rem;font-weight:700;color:var(--g);margin-top:2px}
+.cart-item-ctrl{display:flex;align-items:center;gap:0;background:#f5f5f5;border-radius:20px;overflow:hidden;flex-shrink:0}
+.cart-qb{width:32px;height:32px;border:none;background:none;font-size:1.1rem;font-weight:700;
+  color:var(--hdr);cursor:pointer;display:flex;align-items:center;justify-content:center;
+  touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+.cart-qb:active{background:var(--ambl)}
+.cart-qn{width:28px;text-align:center;font-size:.9rem;font-weight:800;color:var(--b)}
+.cart-drawer-footer{padding:12px 16px;border-top:1px solid #f0e8d8;flex-shrink:0;background:#fff}
+.cart-drawer-total{display:flex;justify-content:space-between;align-items:center;
+  margin-bottom:12px}
+.cart-drawer-total-lbl{font-size:.85rem;color:#888;font-weight:600}
+.cart-drawer-total-val{font-size:1.15rem;font-weight:800;color:var(--hdr)}
+.cart-drawer-checkout{width:100%;padding:14px;background:var(--hdr);color:var(--amber);
+  border:none;border-radius:13px;font-size:.97rem;font-weight:800;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;gap:7px;touch-action:manipulation}
+.cart-drawer-checkout:active{transform:scale(.98);background:#2d1505}
+.c-cart{cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+.c-cart:active{transform:scale(.95)}
 .c-success{display:none;position:absolute;inset:0;background:var(--hdr);z-index:10;
   flex-direction:column;align-items:center;justify-content:flex-start;
   padding:40px 24px env(safe-area-inset-bottom,24px);text-align:center;
@@ -538,7 +581,7 @@ input, select, textarea {font-size: 16px !important}
   <div class="c-hdr">
     <div class="c-hdr-top">
       <div class="c-shop-name" id="secret-zone" oncontextmenu="return false"><img src="" id="hdr-logo" style="width:36px;height:36px;border-radius:10px;object-fit:cover;vertical-align:middle;margin-right:6px"> Light Melt</div>
-      <div class="c-cart">🛒 <span id="cart-count">0</span></div>
+      <div class="c-cart" onclick="openCartDrawer()">🛒 <span id="cart-count">0</span></div>
     </div>
     <div class="c-hdr-sub">เลือกเมนูที่ต้องการแล้วกดยืนยัน</div>
   </div>
@@ -636,6 +679,26 @@ input, select, textarea {font-size: 16px !important}
     </div>
   </div>
 </div><!-- /v-cust -->
+
+<!-- Cart Drawer -->
+<div id="cart-drawer-bg" onclick="closeCartDrawer()">
+  <div id="cart-drawer" onclick="event.stopPropagation()">
+    <div class="cart-drawer-hdr">
+      <div class="cart-drawer-title">🛒 ตะกร้าของคุณ</div>
+      <button class="cart-drawer-close" onclick="closeCartDrawer()">✕</button>
+    </div>
+    <div class="cart-drawer-body" id="cart-drawer-body"></div>
+    <div class="cart-drawer-footer">
+      <div class="cart-drawer-total">
+        <span class="cart-drawer-total-lbl">รวมทั้งหมด</span>
+        <span class="cart-drawer-total-val" id="cart-drawer-total">฿0</span>
+      </div>
+      <button class="cart-drawer-checkout" onclick="closeCartDrawer();expandPanel()">
+        ✅ ไปกรอกชื่อและยืนยัน
+      </button>
+    </div>
+  </div>
+</div>
 
 <!-- Image Viewer Overlay -->
 <div id="img-viewer" onclick="closeImgViewer()">
@@ -1561,6 +1624,79 @@ function expandPanel() {
   if (panel) panel.classList.remove('collapsed');
   if (btn)   btn.textContent = '▼';
 }
+
+// ════════════════════════════════════════
+// CART DRAWER
+// ════════════════════════════════════════
+function openCartDrawer() {
+  const totQty = +document.getElementById('cart-count').textContent;
+  if (!totQty) { return; } // ตะกร้าว่าง ไม่ต้องเปิด
+  renderCartDrawer();
+  document.getElementById('cart-drawer-bg').classList.add('show');
+  document.body.style.overflow = 'hidden';
+}
+function closeCartDrawer() {
+  document.getElementById('cart-drawer-bg').classList.remove('show');
+  document.body.style.overflow = '';
+}
+function renderCartDrawer() {
+  const body = document.getElementById('cart-drawer-body');
+  const totalEl = document.getElementById('cart-drawer-total');
+  let html = '', totRev = 0;
+  MENUS.forEach(m => {
+    // รวม qty ทุก sweetness level
+    const entries = [];
+    if (m.hasSweet || m.cat === 'drink') {
+      const sufs = m.cat === 'drink' ? [['n','หวานปกติ'],['l','หวานน้อย'],['z','ไม่หวาน']] : [['n','หวานปกติ'],['l','หวานน้อย']];
+      sufs.forEach(([suf, label]) => {
+        const el = document.getElementById('oq-' + m.id + '-' + suf);
+        const q = el ? (+el.value || 0) : 0;
+        if (q > 0) entries.push({ q, label });
+      });
+    } else {
+      const el = document.getElementById('oq-' + m.id);
+      const q = el ? (+el.value || 0) : 0;
+      if (q > 0) entries.push({ q, label: '' });
+    }
+    entries.forEach(({ q, label }) => {
+      const subtotal = m.sell * q;
+      totRev += subtotal;
+      const imgSrc = IMG[m.id] || '';
+      const sweetTag = label ? `<div class="cart-item-sweet">${label}</div>` : '';
+      // ปุ่ม +/- ใช้ฟังก์ชัน chgCartQty
+      const suf = label === 'หวานน้อย' ? 'l' : label === 'ไม่หวาน' ? 'z' : label === 'หวานปกติ' ? 'n' : '';
+      const inputId = suf ? `oq-${m.id}-${suf}` : `oq-${m.id}`;
+      html += `<div class="cart-item-row">
+        <img class="cart-item-ico" src="${imgSrc}" onerror="this.style.display='none'">
+        <div class="cart-item-info">
+          <div class="cart-item-name">${m.ico} ${m.name}</div>
+          ${sweetTag}
+          <div class="cart-item-price">฿${subtotal}</div>
+        </div>
+        <div class="cart-item-ctrl">
+          <button class="cart-qb" onclick="chgCartQty('${inputId}',-1)">−</button>
+          <span class="cart-qn">${q}</span>
+          <button class="cart-qb" onclick="chgCartQty('${inputId}',+1)">+</button>
+        </div>
+      </div>`;
+    });
+  });
+  if (!html) html = '<div style="text-align:center;color:#ccc;padding:32px 0;font-size:.9rem">ยังไม่มีสินค้าในตะกร้า</div>';
+  body.innerHTML = html;
+  if (totalEl) totalEl.textContent = '฿' + totRev;
+}
+function chgCartQty(inputId, delta) {
+  const el = document.getElementById(inputId);
+  if (!el) return;
+  const newVal = Math.max(0, (+el.value || 0) + delta);
+  el.value = newVal;
+  calcOrder();
+  // ถ้าตะกร้าว่างให้ปิด drawer
+  const totQty = +document.getElementById('cart-count').textContent;
+  if (!totQty) { closeCartDrawer(); return; }
+  renderCartDrawer(); // re-render
+}
+
 function toggleOD() {
   odOpen = !odOpen;
   document.getElementById('order-detail').classList.toggle('open', odOpen);
