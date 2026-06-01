@@ -2283,7 +2283,8 @@ function saveDay() {
   const date = document.getElementById('dateInput').value;
   if (!date) { toast('⚠️ เลือกวันที่ก่อน'); return; }
   const rows = MENUS.map(m => ({
-    id:m.id,name:m.name,ico:m.ico,sub:m.sub,sell:m.sell,cost:m.cost,
+    id:m.id, name:m.name, ico:m.ico, sub:m.sub, sell:m.sell,
+    cost: getDailyCost(m.id, date), // ✅ ใช้ daily override cost ไม่ใช่ base cost
     qty: +document.getElementById('sq-'+m.id).value||0
   }));
   const totBox = rows.reduce((s,r)=>s+r.qty,0);
@@ -3291,7 +3292,7 @@ function syncSalesFromAccepted() {
     localDateStr();
   const qtys = {};
   acceptedCache.forEach(ord => {
-    if ((ord.date || '') !== today) return;
+    if ((ord.date || '').slice(0,10) !== today) return; // ✅ slice ป้องกัน ISO timestamp mismatch
     const items = Array.isArray(ord.items) ? ord.items : Object.values(ord.items || {});
     items.forEach(it => {
       if (it && it.id) qtys[it.id] = (qtys[it.id] || 0) + (it.qty || 0);
@@ -3315,7 +3316,8 @@ function autoSaveDay() {
   const date = document.getElementById('dateInput').value;
   if (!date) return;
   const rows = MENUS.map(m => ({
-    id:m.id, name:m.name, ico:m.ico, sub:m.sub, sell:m.sell, cost:m.cost,
+    id:m.id, name:m.name, ico:m.ico, sub:m.sub, sell:m.sell,
+    cost: getDailyCost(m.id, date), // ✅ ใช้ daily override cost ไม่ใช่ base cost
     qty: +document.getElementById('sq-'+m.id).value||0
   }));
   const totBox = rows.reduce((s,r) => s+r.qty, 0);
@@ -4224,6 +4226,7 @@ function loadSummaryMonth(monthStr) {
   acceptedCache.forEach(function(o){ if(o&&o.id) orderHistoryCache[o.id]=o; });
   const extraByDate = {};
   Object.values(orderHistoryCache).forEach(function(o) {
+    if (o.isSummary) return; // ✅ ไม่รวม synthetic entries ป้องกันการนับซ้ำ
     const d = (o.date || '').slice(0,10);
     if (!d || d.slice(0,7) !== monthStr || coveredDates.has(d)) return;
     if (!extraByDate[d]) extraByDate[d] = [];
