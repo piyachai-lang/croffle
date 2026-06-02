@@ -2694,19 +2694,26 @@ function saveDailyCostForDate() {
     saveHist(hist2);
   }
 
-  // ✅ ใช้ dateStr (วันที่เซฟต้นทุน) เสมอ — ไม่ใช่ summaryDateStr ที่อาจเป็นวันอื่น
-  summaryDateStr = dateStr; // sync ให้ Summary tab ชี้ไปที่วันที่เพิ่งแก้ต้นทุน
+  // ✅ ตั้งค่า summary dates ให้ชี้ไปที่วันที่เพิ่งแก้ต้นทุน
+  summaryDateStr  = dateStr;
   summaryMonthStr = dateStr.slice(0,7);
+  summaryWeekStart = ''; // ← clear เพื่อให้ week mode ใช้ summaryDateStr แทน (ไม่ดึงสัปดาห์เก่า)
+
   syncCrHistFromCache();
-  // refresh Summary ด้วยวันที่ตรง เพื่อให้เห็นต้นทุน/กำไรใหม่ทันที
-  if (summaryMode === 'month') { loadSummaryMonth(dateStr.slice(0,7)); }
-  else if (summaryMode === 'week') { loadSummaryWeek(dateStr); }
-  else { loadSummaryDate(dateStr); }
+
+  // ✅ refresh ทุก mode เสมอ — ไม่ว่า user จะเปิด mode ไหนอยู่ก็ตาม
+  loadSummaryDate(dateStr);       // day mode: แสดงวันที่แก้ต้นทุน
+  loadSummaryWeek(dateStr);       // week mode: sets summaryWeekStart + pre-populate
+  loadSummaryMonth(dateStr.slice(0,7)); // month mode: pre-populate
+
+  // อัพเดตปุ่ม mode ให้แสดงถูก mode ที่ใช้อยู่ (ไม่บังคับเปลี่ยน mode)
+  setSumMode(summaryMode);
+
   renderCalendar();
   renderHist();
   if (typeof updWeekChart === 'function') updWeekChart();
 
-  toast('✅ บันทึกต้นทุนวันที่ ' + dateStr + ' — กดแท็บ "สรุป" เพื่อดูผล');
+  toast('✅ บันทึกต้นทุนวันที่ ' + dateStr + ' — สรุปอัปเดตแล้ว');
 }
 
 function onDcDateChange(newDate) {
