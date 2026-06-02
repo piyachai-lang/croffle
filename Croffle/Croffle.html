@@ -2604,15 +2604,42 @@ function renderDailyCostRows() {
   if (!dateStr) { el.innerHTML = '<div class="dc-note" style="color:#bbb">เลือกวันที่ก่อน</div>'; return; }
   var override = dailyCostOverrides[dateStr] || {};
   var hasAnyOverride = Object.keys(override).length > 0;
+
+  // ✅ หาต้นทุนจริงที่ stored ใน orders ของวันนั้น
+  var storedCosts = {};
+  Object.values(orderHistoryCache).forEach(function(o) {
+    if (o.isSummary || (o.date||'').slice(0,10) !== dateStr) return;
+    var items = Array.isArray(o.items)?o.items:Object.values(o.items||{});
+    items.forEach(function(it){
+      if(it&&it.id&&storedCosts[it.id]==null&&it.cost!=null&&it.cost!==0)
+        storedCosts[it.id]=+it.cost;
+    });
+  });
+
   el.innerHTML = MENUS.map(function(m) {
     var hasOverride = override[m.id] != null;
     var val = hasOverride ? override[m.id] : m.cost.toFixed(2);
+    var storedCost = storedCosts[m.id];
+    // แสดง warning ถ้า stored cost ต่างจาก m.cost (และยังไม่มี override)
+    var hasStaleCost = !hasOverride && storedCost != null && Math.abs(storedCost - m.cost) > 0.001;
+
     var inputStyle = hasOverride
       ? 'border-color:#E65100;background:#FFF3E0'
-      : 'border-color:#e0d4c8;color:#aaa';
+      : hasStaleCost
+        ? 'border-color:#1565C0;background:#E3F2FD'
+        : 'border-color:#e0d4c8;color:#aaa';
+
     var tag = hasOverride
       ? '<span style="font-size:.68rem;color:#E65100;font-weight:700">📌 override</span>'
-      : '<span style="font-size:.68rem;color:#bbb">ค่าเริ่มต้น</span>';
+      : hasStaleCost
+        ? '<span style="font-size:.68rem;color:#1565C0;font-weight:700">⚠️ orders ใช้ ฿'+storedCost.toFixed(2)+'</span>'
+        : '<span style="font-size:.68rem;color:#bbb">ค่าเริ่มต้น</span>';
+
+    // ถ้า stored cost ต่างจาก m.cost และยังไม่มี override → แนะนำให้ตั้งเป็น m.cost
+    var hintText = hasStaleCost
+      ? '<span style="font-size:.62rem;color:#1565C0">💡 กด บันทึก เพื่อแก้เป็น ฿'+m.cost.toFixed(2)+'</span>'
+      : '<span id="dc-def-' + m.id + '" style="font-size:.65rem;color:#aaa">default ฿' + m.cost.toFixed(2) + '</span>';
+
     return '<div class="set-row" style="align-items:center;gap:6px">' +
       '<div class="set-name" style="flex:1">' + m.ico + ' ' + m.name + '</div>' +
       '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px">' +
@@ -2622,7 +2649,7 @@ function renderDailyCostRows() {
           ' oninput="dcMarkChanged(\'' + m.id + '\')">' +
           '<span style="font-size:.75rem;color:#999">฿</span>' +
         '</div>' +
-        '<span id="dc-def-' + m.id + '" style="font-size:.65rem;color:#aaa">default ฿' + m.cost.toFixed(2) + '</span>' +
+        hintText +
       '</div>' +
     '</div>';
   }).join('') +
@@ -2651,25 +2678,41 @@ function saveDailyCostForDate() {
   if (!dateStr) { toast('⚠️ เลือกวันที่ก่อน'); return; }
   var override = {};
   var ok = true;
+
+  // ✅ หาต้นทุนที่ orders วันนั้น stored ไว้จริง
+  // (อาจต่างจาก m.cost ถ้าราคาถูกอัพเดตหลังจากที่ orders ถูกบันทึก)
+  var storedCosts = {};
+  Object.values(orderHistoryCache).forEach(function(o) {
+    if (o.isSummary || (o.date||'').slice(0,10) !== dateStr) return;
+    var items = Array.isArray(o.items) ? o.items : Object.values(o.items||{});
+    items.forEach(function(it) {
+      if (it && it.id && storedCosts[it.id] == null && it.cost != null && it.cost !== 0)
+        storedCosts[it.id] = +it.cost;
+    });
+  });
+
   MENUS.forEach(function(m) {
     var el = document.getElementById('dc-inp-' + m.id);
     if (!el) return;
     var v = +el.value;
     if (isNaN(v) || v < 0) { ok = false; return; }
-    // ✅ FIX: บันทึกเฉพาะค่าที่ต่างจาก default — ถ้าเท่ากับ default ไม่ต้อง override
-    // เหตุผล: ป้องกัน default เก่า lock เป็น override แม้ default หลักเปลี่ยนไป
-    if (Math.abs(v - m.cost) > 0.001) {
+    // บันทึก override ถ้า:
+    // 1) v ต่างจาก m.cost (base) — ตั้งใจเปลี่ยน
+    // 2) v ต่างจาก storedCost ใน orders — แก้ต้นทุนย้อนหลัง
+    //    (เกิดเมื่อ base cost ถูกอัพเดตหลังจากที่ orders ถูกบันทึก)
+    var stored = storedCosts[m.id];
+    if (Math.abs(v - m.cost) > 0.001 || (stored != null && Math.abs(v - stored) > 0.001)) {
       override[m.id] = v;
     }
   });
   if (!ok) { toast('⚠️ ตรวจสอบตัวเลข'); return; }
-  // ถ้าไม่มีค่าที่ต่างจาก default เลย → ล้าง override วันนั้น
+  // ถ้าไม่มีค่าที่ต่างเลย (ทั้ง m.cost และ stored orders) → ล้าง override
   if (Object.keys(override).length === 0) {
     delete dailyCostOverrides[dateStr];
     localStorage.setItem('crDailyCostOverrides', JSON.stringify(dailyCostOverrides));
     if (fbReady && db) db.ref('croffle/dailyCostOverrides/' + dateStr).remove();
     renderDailyCostRows();
-    toast('ℹ️ ต้นทุนเหมือน default — ใช้ต้นทุนหลักแทน override');
+    toast('ℹ️ ต้นทุนตรงกับข้อมูล orders แล้ว — ไม่ต้อง override');
     return;
   }
   dailyCostOverrides[dateStr] = override;
