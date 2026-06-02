@@ -2694,17 +2694,19 @@ function saveDailyCostForDate() {
     saveHist(hist2);
   }
 
-  // refresh ทุก tab เสมอ ไม่ว่าจะเปิด tab ไหนอยู่
-  // เพื่อให้เมื่อสลับ tab ข้อมูลต้นทุนถูกต้องทันที
+  // ✅ ใช้ dateStr (วันที่เซฟต้นทุน) เสมอ — ไม่ใช่ summaryDateStr ที่อาจเป็นวันอื่น
+  summaryDateStr = dateStr; // sync ให้ Summary tab ชี้ไปที่วันที่เพิ่งแก้ต้นทุน
+  summaryMonthStr = dateStr.slice(0,7);
   syncCrHistFromCache();
-  if (summaryMode === 'month') { loadSummaryMonth(summaryMonthStr); }
-  else if (summaryMode === 'week') { loadSummaryWeek(summaryWeekStart || summaryDateStr || dateStr); }
-  else { loadSummaryDate(summaryDateStr || dateStr); }
+  // refresh Summary ด้วยวันที่ตรง เพื่อให้เห็นต้นทุน/กำไรใหม่ทันที
+  if (summaryMode === 'month') { loadSummaryMonth(dateStr.slice(0,7)); }
+  else if (summaryMode === 'week') { loadSummaryWeek(dateStr); }
+  else { loadSummaryDate(dateStr); }
   renderCalendar();
   renderHist();
   if (typeof updWeekChart === 'function') updWeekChart();
 
-  toast('✅ บันทึกต้นทุนวันที่ ' + dateStr + ' เรียบร้อย');
+  toast('✅ บันทึกต้นทุนวันที่ ' + dateStr + ' — กดแท็บ "สรุป" เพื่อดูผล');
 }
 
 function onDcDateChange(newDate) {
