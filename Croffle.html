@@ -1245,6 +1245,23 @@ function initFirebase() {
       // register listener หลัง migration → ไม่มีทางรับราคาเก่าจาก Firebase
       db.ref('croffle/menuCustom').on('value', function(snap) {
         var overrides = snap.val() || {};
+        // ตรวจสอบว่า Firebase มีราคาต่ำกว่า code default ไหม → ถ้ามีให้ fix ทันที
+        var fbNeedsFix = false;
+        var fixedOverrides = {};
+        Object.keys(overrides).forEach(function(id) {
+          var def = MENUS_CODE_DEFAULT[id];
+          var ov = overrides[id];
+          if (!def || !ov || typeof ov !== 'object') return;
+          var fixedOv = Object.assign({}, ov);
+          if (ov.sell != null && +ov.sell < def.sell) { fixedOv.sell = def.sell; fbNeedsFix = true; }
+          if (ov.cost != null && +ov.cost < def.cost) { fixedOv.cost = def.cost; fbNeedsFix = true; }
+          fixedOverrides[id] = fixedOv;
+        });
+        if (fbNeedsFix) {
+          db.ref('croffle/menuCustom').set(fixedOverrides); // แก้ Firebase ทันที
+          overrides = fixedOverrides;
+        }
+        // reset → apply override ที่ผ่านการตรวจสอบแล้ว
         MENUS.forEach(function(m) {
           m.sell = MENUS_CODE_DEFAULT[m.id].sell;
           m.cost = MENUS_CODE_DEFAULT[m.id].cost;
@@ -1252,9 +1269,11 @@ function initFirebase() {
         var validIds = MENUS.map(function(m){ return m.id; });
         MENUS.forEach(function(m) {
           var ov = overrides[m.id];
+          var def = MENUS_CODE_DEFAULT[m.id];
           if (ov && typeof ov === 'object') {
-            if (ov.sell != null) m.sell = +ov.sell;
-            if (ov.cost != null) m.cost = +ov.cost;
+            // apply เฉพาะราคาที่ >= code default (ป้องกันค่าเก่าต่ำกว่า default)
+            if (ov.sell != null && +ov.sell >= def.sell) m.sell = +ov.sell;
+            if (ov.cost != null && +ov.cost >= def.cost) m.cost = +ov.cost;
           }
         });
         var clean = {};
@@ -3205,6 +3224,10 @@ function saveMenuSettings() {
   var overrides = {};
   MENUS.forEach(function(m) {
     var def = MENUS_CODE_DEFAULT[m.id];
+    // บังคับให้ราคาไม่ต่ำกว่า code default (ป้องกัน old-code device เขียน 60 กลับ Firebase)
+    if (m.sell < def.sell) m.sell = def.sell;
+    if (m.cost < def.cost) m.cost = def.cost;
+    // เก็บเฉพาะ override ที่ต่างจาก default จริงๆ
     if (Math.abs(m.sell - def.sell) > 0.001 || Math.abs(m.cost - def.cost) > 0.001) {
       overrides[m.id] = { sell: m.sell, cost: m.cost };
     }
