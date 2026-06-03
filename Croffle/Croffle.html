@@ -544,12 +544,29 @@ html,body{height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFo
   cursor:pointer;margin-top:10px;-webkit-appearance:none}
 
 /* ══ CALENDAR ACTION ROW ══════════════ */
-.cal-act-row{display:flex;gap:8px;margin-top:10px}
-.cal-act-btn{flex:1;padding:10px 6px;border:none;border-radius:10px;
-  font-size:.82rem;font-weight:700;cursor:pointer;-webkit-appearance:none}
+.cal-act-row{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
+.cal-act-btn{flex:1;min-width:70px;padding:9px 4px;border:none;border-radius:10px;
+  font-size:.78rem;font-weight:700;cursor:pointer;-webkit-appearance:none;touch-action:manipulation}
 .cal-act-edit{background:#FFF3E0;color:#E65100}
 .cal-act-cancel{background:#FFEBEE;color:#C62828}
+.cal-act-move{background:#E8F5E9;color:#2E7D32}
 .cal-act-btn:active{opacity:.75}
+/* ══ MOVE ORDER DIALOG ════════════════ */
+#dlg-move-ord{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:300;
+  display:none;align-items:flex-end;justify-content:center}
+#dlg-move-ord.show{display:flex}
+.move-ord-box{background:#fff;border-radius:22px 22px 0 0;width:100%;max-width:520px;
+  padding:20px 18px 32px;padding-bottom:max(32px,env(safe-area-inset-bottom,32px))}
+.move-ord-title{font-size:1rem;font-weight:800;color:var(--hdr);margin-bottom:4px}
+.move-ord-sub{font-size:.78rem;color:#aaa;margin-bottom:16px}
+.move-ord-inp{width:100%;padding:12px 14px;border:2px solid #e0d0b8;border-radius:12px;
+  font-size:.95rem;color:var(--hdr);outline:none;box-sizing:border-box;-webkit-appearance:none}
+.move-ord-inp:focus{border-color:var(--amber)}
+.move-ord-btns{display:flex;gap:10px;margin-top:14px}
+.move-ord-cancel{flex:1;padding:13px;border:2px solid #e0d0b8;border-radius:12px;
+  background:#fff;color:#888;font-size:.9rem;font-weight:700;cursor:pointer}
+.move-ord-confirm{flex:2;padding:13px;border:none;border-radius:12px;
+  background:var(--hdr);color:var(--amber);font-size:.9rem;font-weight:800;cursor:pointer}
 
 /* ══ IMAGE VIEWER ═════════════════════ */
 #img-viewer{display:none;position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:900;
@@ -903,6 +920,19 @@ input, select, textarea {font-size: 16px !important}
 
   
   </div><!-- /screen-wrap -->
+
+  <!-- Move Order Date Dialog -->
+  <div id="dlg-move-ord">
+    <div class="move-ord-box">
+      <div class="move-ord-title">📅 ย้ายวันออเดอร์</div>
+      <div class="move-ord-sub" id="move-ord-sub">ออเดอร์ของ —</div>
+      <input type="date" id="move-ord-date" class="move-ord-inp">
+      <div class="move-ord-btns">
+        <button class="move-ord-cancel" onclick="closeMoveOrdDlg()">ยกเลิก</button>
+        <button class="move-ord-confirm" onclick="confirmMoveOrd()">📅 ย้ายวัน</button>
+      </div>
+    </div>
+  </div>
 
 <nav class="bottomnav">
     <button class="nbtn active" id="nb-orders"   onclick="tab('orders')">
@@ -2769,16 +2799,23 @@ function onDcDateChange(newDate) {
 // CALENDAR — edit/cancel real orders
 // ════════════════════════════════════════
 function calEditOrder(id) {
-  // ดูจาก orderHistoryCache ก่อน
   var ord = orderHistoryCache[id];
-  if (!ord) { toast('⚠️ ไม่พบออเดอร์'); return; }
-  // ถ้ายังอยู่ใน acceptedCache ให้ใช้ editAcceptedOrder เดิม
+  if (!ord) {
+    // ลอง reload แล้วค้นใหม่
+    loadOrderHistory();
+    toast('⚠️ กำลังโหลดข้อมูล กรุณาลองใหม่อีกครั้ง');
+    return;
+  }
+  // ถ้าอยู่ใน acceptedCache แล้ว → edit โดยตรง
   if (acceptedCache.find(function(o){ return o.id === id; })) {
     editAcceptedOrder(id);
     return;
   }
-  // ไม่อยู่ใน acceptedCache → เพิ่มชั่วคราวแล้ว edit
-  acceptedCache.push(ord);
+  // ไม่อยู่ใน acceptedCache (history order) → push ชั่วคราวแล้ว edit
+  // ✅ dedup: ตรวจสอบก่อนว่ายังไม่ได้ push ไปแล้ว
+  if (!acceptedCache.some(function(o){ return o.id === id; })) {
+    acceptedCache.push(ord);
+  }
   editAcceptedOrder(id);
 }
 
@@ -2814,23 +2851,92 @@ function calCancelOrder(id) {
 }
 
 // ════════════════════════════════════════
+// MOVE ORDER DATE
+// ════════════════════════════════════════
+let _moveOrdId = null;
+
+function openMoveOrdDlg(id) {
+  var ord = orderHistoryCache[id];
+  if (!ord) { toast('⚠️ ไม่พบออเดอร์'); return; }
+  _moveOrdId = id;
+  var sub = document.getElementById('move-ord-sub');
+  if (sub) sub.textContent = 'ออเดอร์ของ ' + (ord.customerName || 'ไม่ระบุ') + ' — วันเดิม ' + fdate((ord.date||'').slice(0,10));
+  var inp = document.getElementById('move-ord-date');
+  if (inp) inp.value = (ord.date||'').slice(0,10) || localDateStr();
+  document.getElementById('dlg-move-ord').classList.add('show');
+}
+
+function closeMoveOrdDlg() {
+  document.getElementById('dlg-move-ord').classList.remove('show');
+  _moveOrdId = null;
+}
+
+function confirmMoveOrd() {
+  if (!_moveOrdId) return;
+  var newDate = document.getElementById('move-ord-date').value;
+  if (!newDate) { toast('⚠️ เลือกวันที่ใหม่ก่อน'); return; }
+  var ord = orderHistoryCache[_moveOrdId];
+  if (!ord) { toast('⚠️ ไม่พบออเดอร์'); closeMoveOrdDlg(); return; }
+  var oldDate = (ord.date||'').slice(0,10);
+  if (newDate === oldDate) { toast('ℹ️ วันที่เหมือนเดิม'); closeMoveOrdDlg(); return; }
+
+  customConfirm(
+    'ย้ายออเดอร์ของ <b>' + (ord.customerName||'ไม่ระบุ') + '</b><br>จาก ' + fdate(oldDate) + '<br>ไป ' + fdate(newDate) + '?',
+    function() {
+      // อัพเดต date ใน order
+      ord.date = newDate;
+      ord.preorderDate = newDate;
+      // บันทึกลง Firebase
+      if (db) {
+        db.ref('croffle/orderHistory/' + _moveOrdId + '/date').set(newDate);
+        db.ref('croffle/orderHistory/' + _moveOrdId + '/preorderDate').set(newDate);
+        if (acceptedCache.find(function(o){ return o.id === _moveOrdId; })) {
+          db.ref('croffle/accepted/' + _moveOrdId + '/date').set(newDate);
+          db.ref('croffle/accepted/' + _moveOrdId + '/preorderDate').set(newDate);
+        }
+      }
+      // อัพเดต local caches
+      orderHistoryCache[_moveOrdId] = ord;
+      var accIdx = acceptedCache.findIndex(function(o){ return o.id === _moveOrdId; });
+      if (accIdx >= 0) { acceptedCache[accIdx].date = newDate; }
+      localStorage.setItem('crAcceptedOrders', JSON.stringify(acceptedCache));
+      var lh = JSON.parse(localStorage.getItem('crOrderHistory')||'{}');
+      if (lh[_moveOrdId]) { lh[_moveOrdId].date = newDate; localStorage.setItem('crOrderHistory', JSON.stringify(lh)); }
+      // recalculate crHist ทั้งสองวัน
+      cleanCrHistForDate(oldDate);
+      updateHistFromOrders(newDate);
+      syncCrHistFromCache();
+      // ย้าย calDate ไปที่วันใหม่เพื่อให้เห็นผล
+      calDate = newDate;
+      renderCalendar();
+      renderOrders();
+      toast('✅ ย้ายออเดอร์ไป ' + fdate(newDate) + ' แล้ว');
+      closeMoveOrdDlg();
+    },
+    '📅 ย้ายวัน', 'ยกเลิก'
+  );
+}
+
+// ════════════════════════════════════════
 // EDIT ACCEPTED ORDER
 // ════════════════════════════════════════
 let _editOrdId = null;
 
 function editAcceptedOrder(id) {
   const ord = acceptedCache.find(function(o){ return o.id === id; });
-  if (!ord) return;
+  if (!ord) { toast('⚠️ ไม่สามารถแก้ไขออเดอร์นี้ได้ กรุณาลองใหม่'); return; }
   _editOrdId = id;
   document.getElementById('dlg-edit-cust').textContent = '👤 ' + (ord.customerName || 'ไม่ระบุ');
   const items = Array.isArray(ord.items) ? ord.items : Object.values(ord.items || {});
   document.getElementById('dlg-edit-items').innerHTML = MENUS.map(function(m) {
     const it = items.find(function(x){ return x.id === m.id; });
     const q = it ? (it.qty || 0) : 0;
+    // ✅ ใช้ราคาที่ stored ใน order (it.sell) แทน m.sell ปัจจุบัน
+    const displaySell = it && it.sell != null ? it.sell : m.sell;
     return '<div class="dlg-menu-row">' +
       '<div class="dlg-menu-ico">' + m.ico + '</div>' +
-      '<div class="dlg-menu-info"><div class="dlg-menu-name">' + m.name + '</div>' +
-      '<div class="dlg-menu-price">฿' + m.sell + '</div></div>' +
+      '<div class="dlg-menu-info"><div class="dlg-menu-name">' + m.name + (it&&it.sweet?' <span style="font-size:.65rem;background:#FFF3E0;color:#E65100;border-radius:4px;padding:1px 5px">'+it.sweet+'</span>':'') + '</div>' +
+      '<div class="dlg-menu-price">฿' + displaySell + '</div></div>' +
       '<div class="dlg-qty">' +
       '<button class="dlg-qb" onclick="editOrdAdj(\'' + m.id + '\',-1)">−</button>' +
       '<input class="dlg-qn" id="eo-' + m.id + '" type="number" min="0" value="' + q + '" oninput="calcEditOrdTotal()">' +
@@ -2998,9 +3104,22 @@ function saveMenuSettings() {
   });
   if (!ok) { toast('⚠️ กรุณาตรวจสอบตัวเลข'); return; }
   localStorage.setItem('crMenuCustom', JSON.stringify(custom));
-  toast('✅ บันทึกราคา/ต้นทุนเรียบร้อย');
+
+  // ✅ rebuild หน้าลูกค้า — ราคาใหม่จะแสดงทันที
+  ['c-croffle','c-drink','c-khanom'].forEach(function(id){
+    var el = document.getElementById(id);
+    if (el) el.innerHTML = '';
+  });
+  ['s-croffle','s-drink','s-khanom'].forEach(function(id){
+    var el = document.getElementById(id);
+    if (el) el.innerHTML = '';
+  });
+  buildOrderMenus();
+  buildSalesCards();
+  applyMenuStatusToCustomer(); // คงสถานะ sold-out/preorder เดิม
+
+  toast('✅ บันทึกราคา/ต้นทุนเรียบร้อย — ราคาหน้าร้านอัปเดตแล้ว');
   calcSales();
-  // refresh ทุก tab ด้วยต้นทุนหลักใหม่
   syncCrHistFromCache();
   if (typeof summaryMode !== 'undefined') {
     if (summaryMode === 'month') { loadSummaryMonth(summaryMonthStr); }
@@ -3628,6 +3747,7 @@ function renderCalendar() {
       : isRealOrder
       ? '<div class="cal-act-row">'
         + '<button class="cal-act-btn cal-act-edit" onclick="calEditOrder(\''+ord.id+'\')">'+'✏️ แก้ไข</button>'
+        + '<button class="cal-act-btn cal-act-move" onclick="openMoveOrdDlg(\''+ord.id+'\')">'+'📅 ย้ายวัน</button>'
         + '<button class="cal-act-btn cal-act-cancel" onclick="calCancelOrder(\''+ord.id+'\')">'+'❌ ยกเลิก</button>'
         + '</div>'
       : '';
