@@ -1640,6 +1640,11 @@ function getSweetness(id) {
 }
 
 function buildOrderMenus() {
+  // ✅ clear ก่อนเสมอ — ป้องกันเมนูซ้อนกันเมื่อถูกเรียกซ้ำ (เช่น จาก Firebase listener)
+  ['c-croffle','c-drink','c-khanom'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.innerHTML = '';
+  });
   MENUS.forEach(m => {
     const isSweet = m.hasSweet || m.cat === 'drink';
     // สร้าง HTML ส่วน qty controls
@@ -2214,6 +2219,11 @@ function notifyPaymentTransferred() {
 let barC, pieC, weekC;
 
 function buildSalesCards() {
+  // ✅ clear ก่อนเสมอ — ป้องกัน sales card ซ้อนกันเมื่อถูกเรียกซ้ำ
+  ['s-croffle','s-drink','s-khanom'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.innerHTML = '';
+  });
   MENUS.forEach(m => {
     const html = `
       <div class="smc">
@@ -3202,15 +3212,7 @@ function saveMenuSettings() {
     if (fbReady && db) db.ref('croffle/dailyCostOverrides/' + today).set(todayOverride);
   }
 
-  // ✅ rebuild หน้าลูกค้า — ราคาใหม่จะแสดงทันที
-  ['c-croffle','c-drink','c-khanom'].forEach(function(id){
-    var el = document.getElementById(id);
-    if (el) el.innerHTML = '';
-  });
-  ['s-croffle','s-drink','s-khanom'].forEach(function(id){
-    var el = document.getElementById(id);
-    if (el) el.innerHTML = '';
-  });
+  // ✅ rebuild หน้าลูกค้า — ราคาใหม่จะแสดงทันที (clear อยู่ใน buildOrderMenus/buildSalesCards แล้ว)
   buildOrderMenus();
   buildSalesCards();
   applyMenuStatusToCustomer(); // คงสถานะ sold-out/preorder เดิม
