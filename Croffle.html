@@ -3605,6 +3605,20 @@ function autoSaveDay() {
 // INIT
 // ════════════════════════════════════════
 window.onload = () => {
+  // ── App version check: ล้าง localStorage เก่าเมื่อ code อัปเดต ──────────
+  // เปลี่ยน APP_VERSION ทุกครั้งที่ราคา default ในโค้ดเปลี่ยน
+  var APP_VERSION = 'v20260603-price65';
+  if (localStorage.getItem('appVersion') !== APP_VERSION) {
+    // โค้ดใหม่โหลดครั้งแรก → ล้างราคาเก่าออกจาก localStorage ทั้งหมด
+    localStorage.removeItem('crMenuCustom');
+    localStorage.setItem('appVersion', APP_VERSION);
+  }
+  // ── ตรวจสอบ MENUS ให้แน่ใจว่าราคาถูกต้อง (failsafe) ──────────────────
+  MENUS.forEach(function(m) {
+    var def = MENUS_CODE_DEFAULT[m.id];
+    if (m.sell !== def.sell) m.sell = def.sell;
+    if (m.cost !== def.cost) m.cost = def.cost;
+  });
   loadMenuCustom();         // โหลดราคา/ต้นทุนที่ปรับแล้ว
   loadMenuStatus();         // โหลดสถานะเมนูรายการ
   loadDailyCostOverrides(); // โหลด daily cost overrides
