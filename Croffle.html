@@ -1187,6 +1187,13 @@ const MENUS = [
   {id:'k2', ico:'🍜', name:'ขนมจีนน้ำเงี้ยว พิเศษ',  sub:'1 ถ้วย/ถุง',   sell:70, cost:37.18, cat:'khanom'},
 ];
 
+// ── snapshot ค่า default ดั้งเดิมในโค้ด (immutable) ──────────────────────
+// ใช้เปรียบเทียบกับข้อมูลใน Firebase เพื่อป้องกัน default เก่าทับค่าใหม่
+const MENUS_CODE_DEFAULT = {};
+MENUS.forEach(function(m) {
+  MENUS_CODE_DEFAULT[m.id] = { sell: m.sell, cost: m.cost };
+});
+
 // ════════════════════════════════════════
 // FIREBASE STATE
 // ════════════════════════════════════════
@@ -1302,6 +1309,32 @@ function initFirebase() {
     db.ref('croffle/menuCustom').on('value', function(snap) {
       var remote = snap.val();
       if (remote && typeof remote === 'object') {
+        // ── auto-migrate: แก้ค่าใน Firebase ที่ล้าหลังกว่า code default ──────
+        // เกิดเมื่อ: dev อัปเดตราคา default ในโค้ดใหม่ แต่ Firebase ยังเก็บค่าเก่าไว้
+        // ตรรกะ: เทียบ Firebase value กับ MENUS_CODE_DEFAULT (snapshot ก่อน loadMenuCustom)
+        //        ถ้า Firebase มีราคาต่ำกว่า code default ใหม่ → ถือว่าเป็นค่าเก่า → อัปเดต
+        var needsUpdate = false;
+        var updated = JSON.parse(JSON.stringify(remote)); // deep copy
+        MENUS.forEach(function(m) {
+          var def = MENUS_CODE_DEFAULT[m.id];
+          if (!def) return;
+          if (!updated[m.id]) updated[m.id] = {};
+          // sell: Firebase < code default → Firebase มีค่าเก่า → แก้เป็น code default
+          if (updated[m.id].sell != null && +updated[m.id].sell < def.sell) {
+            updated[m.id].sell = def.sell;
+            needsUpdate = true;
+          }
+          // cost: Firebase < code default → แก้เช่นกัน
+          if (updated[m.id].cost != null && +updated[m.id].cost < def.cost) {
+            updated[m.id].cost = def.cost;
+            needsUpdate = true;
+          }
+        });
+        if (needsUpdate) {
+          db.ref('croffle/menuCustom').set(updated); // อัปเดต Firebase (ทำครั้งเดียวอัตโนมัติ)
+          remote = updated;
+        }
+        // ─────────────────────────────────────────────────────────────────────
         localStorage.setItem('crMenuCustom', JSON.stringify(remote));
         MENUS.forEach(function(m) {
           if (remote[m.id]) {
