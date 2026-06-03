@@ -1313,6 +1313,17 @@ function initFirebase() {
         buildOrderMenus();
         buildSalesCards();
         applyMenuStatusToCustomer();
+        // recalculate ต้นทุน/กำไรวันนี้ด้วยราคาใหม่ (ทำทุกอุปกรณ์)
+        var _td = localDateStr();
+        updateHistFromOrders(_td);
+        if (document.getElementById('sc-summary') &&
+            document.getElementById('sc-summary').classList.contains('active')) {
+          if (typeof summaryMode !== 'undefined') {
+            if (summaryMode === 'day') loadSummaryDate(summaryDateStr || _td);
+            else if (summaryMode === 'week') loadSummaryWeek(summaryWeekStart || summaryDateStr || _td);
+            else loadSummaryMonth(summaryMonthStr || _td.slice(0,7));
+          }
+        }
         if (document.getElementById('sc-settings') &&
             document.getElementById('sc-settings').classList.contains('active')) {
           renderMenuSettings();
@@ -3141,6 +3152,23 @@ function saveMenuSettings() {
   // sync ราคา/ต้นทุนไปทุกอุปกรณ์ผ่าน Firebase
   if (fbReady && db) db.ref('croffle/menuCustom').set(custom);
 
+  // ✅ auto-set dailyCostOverrides สำหรับวันนี้ด้วย
+  // เพื่อให้ resolveItemCost() ใช้ต้นทุนใหม่แทนค่าเก่าที่ bake-in ใน orders
+  var today = localDateStr();
+  var todayOverride = dailyCostOverrides[today] || {};
+  var overrideChanged = false;
+  MENUS.forEach(function(m) {
+    if (custom[m.id]) {
+      todayOverride[m.id] = custom[m.id].cost;
+      overrideChanged = true;
+    }
+  });
+  if (overrideChanged) {
+    dailyCostOverrides[today] = todayOverride;
+    localStorage.setItem('crDailyCostOverrides', JSON.stringify(dailyCostOverrides));
+    if (fbReady && db) db.ref('croffle/dailyCostOverrides/' + today).set(todayOverride);
+  }
+
   // ✅ rebuild หน้าลูกค้า — ราคาใหม่จะแสดงทันที
   ['c-croffle','c-drink','c-khanom'].forEach(function(id){
     var el = document.getElementById(id);
@@ -3154,17 +3182,25 @@ function saveMenuSettings() {
   buildSalesCards();
   applyMenuStatusToCustomer(); // คงสถานะ sold-out/preorder เดิม
 
-  toast('✅ บันทึกราคา/ต้นทุนเรียบร้อย — ราคาหน้าร้านอัปเดตแล้ว');
+  // ✅ recalculate ต้นทุน/กำไรวันนี้ด้วยราคาใหม่
+  updateHistFromOrders(today);
   calcSales();
   syncCrHistFromCache();
+
+  // กำหนด summaryDateStr ให้ชี้ที่วันนี้ เพื่อให้ summary refresh ถูกวัน
+  summaryDateStr = today;
+  summaryMonthStr = today.slice(0,7);
+
   if (typeof summaryMode !== 'undefined') {
     if (summaryMode === 'month') { loadSummaryMonth(summaryMonthStr); }
-    else if (summaryMode === 'week') { loadSummaryWeek(summaryWeekStart || summaryDateStr || localDateStr()); }
-    else { loadSummaryDate(summaryDateStr || localDateStr()); }
+    else if (summaryMode === 'week') { loadSummaryWeek(summaryWeekStart || summaryDateStr || today); }
+    else { loadSummaryDate(today); }
   }
   renderCalendar();
   renderHist();
   if (typeof updWeekChart === 'function') updWeekChart();
+
+  toast('✅ บันทึกราคา/ต้นทุนเรียบร้อย — กำไรวันนี้อัปเดตแล้ว');
 }
 
 function resetMenuSettings() {
