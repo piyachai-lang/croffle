@@ -1220,20 +1220,20 @@ function initFirebase() {
     fbReady = true;
     document.getElementById('fb-banner').style.display = 'none';
 
-    // ── บังคับ sync ราคา code default ขึ้น Firebase ทันที ──
-    // ป้องกันกรณี Firebase มีค่าเก่าค้างอยู่ (เช่น c5.sell=60 แทนที่จะเป็น 65)
-    db.ref('croffle/menuCustom').once('value', function(snap) {
-      var stored = snap.val() || {};
-      var patch = {};
-      var needPatch = false;
-      MENUS.forEach(function(m) {
-        var def = MENUS_CODE_DEFAULT[m.id];
-        var s = stored[m.id] || {};
-        if (s.sell == null || +s.sell < def.sell) { patch[m.id] = Object.assign({}, s, { sell: def.sell }); needPatch = true; }
-        else patch[m.id] = s;
-        if (patch[m.id].cost == null || +patch[m.id].cost < def.cost) { patch[m.id].cost = def.cost; needPatch = true; }
-      });
-      if (needPatch) db.ref('croffle/menuCustom').set(patch);
+    // ── Price Schema Migration ──────────────────────────────────────────────
+    // เมื่อ dev อัปเดตราคา default ในโค้ด ให้ bump PRICE_SCHEMA_VER
+    // ระบบจะ reset Firebase ให้ตรงกับ code default ครั้งเดียว แล้วหยุด
+    // หลังจากนั้นเจ้าของร้านสามารถแก้ราคาเองได้ตามปกติ
+    var PRICE_SCHEMA_VER = 3; // bump นี้เมื่อ: c5 แฮมชีส 60→65
+    db.ref('croffle/menuCustom/_ver').once('value', function(snap) {
+      if ((snap.val() || 0) < PRICE_SCHEMA_VER) {
+        // version เก่า → reset ราคาทั้งหมดให้ตรงกับ code default ปัจจุบัน
+        var defaults = { _ver: PRICE_SCHEMA_VER };
+        MENUS.forEach(function(m) {
+          defaults[m.id] = { sell: MENUS_CODE_DEFAULT[m.id].sell, cost: MENUS_CODE_DEFAULT[m.id].cost };
+        });
+        db.ref('croffle/menuCustom').set(defaults);
+      }
     });
 
     // ── Listen: pending orders (real-time, ทุกอุปกรณ์) ──
@@ -1351,11 +1351,14 @@ function initFirebase() {
           remote = updated;
         }
         // ─────────────────────────────────────────────────────────────────────
-        localStorage.setItem('crMenuCustom', JSON.stringify(remote));
+        // กรอง _ver ออกก่อน save localStorage และ apply MENUS
+        var remoteClean = {};
+        Object.keys(remote).forEach(function(k) { if (k !== '_ver') remoteClean[k] = remote[k]; });
+        localStorage.setItem('crMenuCustom', JSON.stringify(remoteClean));
         MENUS.forEach(function(m) {
-          if (remote[m.id]) {
-            if (remote[m.id].sell != null) m.sell = +remote[m.id].sell;
-            if (remote[m.id].cost != null) m.cost = +remote[m.id].cost;
+          if (remoteClean[m.id]) {
+            if (remoteClean[m.id].sell != null) m.sell = +remoteClean[m.id].sell;
+            if (remoteClean[m.id].cost != null) m.cost = +remoteClean[m.id].cost;
           }
         });
         // rebuild UI ราคาหน้าลูกค้าให้ sync ทันที
