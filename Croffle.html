@@ -5,6 +5,28 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
+<script>
+// ลงทะเบียน Service Worker เพื่อบังคับโหลดโค้ดใหม่ทุกครั้ง
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js').then(function(reg) {
+    // ถ้ามี SW ใหม่รอ activate → บังคับ activate ทันที
+    if (reg.waiting) reg.waiting.postMessage({type:'SKIP_WAITING'});
+    reg.addEventListener('updatefound', function() {
+      var newSW = reg.installing;
+      newSW.addEventListener('statechange', function() {
+        if (newSW.state === 'installed' && navigator.serviceWorker.controller) {
+          // มีโค้ดใหม่ → reload หน้าทันที
+          window.location.reload();
+        }
+      });
+    });
+  });
+  // เมื่อ SW controller เปลี่ยน (หลัง claim) → reload
+  navigator.serviceWorker.addEventListener('controllerchange', function() {
+    window.location.reload();
+  });
+}
+</script>
 <link rel="manifest" href="manifest.json">
 
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
