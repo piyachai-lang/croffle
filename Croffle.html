@@ -211,7 +211,9 @@ html,body{height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFo
 .topbar-logo{font-size:1.4rem}
 .topbar-title{color:var(--amber);font-size:1rem;font-weight:800;letter-spacing:.5px}
 .date-pill{background:rgba(245,166,35,.18);border:1.5px solid rgba(245,166,35,.4);
-  border-radius:20px;padding:5px 11px;color:var(--amber);font-size:.8rem;font-weight:700;cursor:pointer;white-space:nowrap}
+  border-radius:20px;padding:5px 11px;color:var(--amber);font-size:.8rem;font-weight:700;cursor:pointer;white-space:nowrap;
+  transition:background .15s,border-color .15s;-webkit-tap-highlight-color:transparent}
+.date-pill:active{background:rgba(245,166,35,.35);border-color:rgba(245,166,35,.7)}
 .lock-btn{background:rgba(255,255,255,.12);border:none;color:rgba(255,255,255,.65);
   width:34px;height:34px;border-radius:10px;cursor:pointer;font-size:1rem;
   display:flex;align-items:center;justify-content:center;transition:all .2s;flex-shrink:0}
@@ -752,7 +754,7 @@ input, select, textarea {font-size: 16px !important}
     <div style="display:flex;align-items:center;gap:8px">
       <div id="fb-dot" title="กำลังเชื่อมต่อ Firebase..."></div>
       <div class="date-pill" onclick="pickDate()">📅 <span id="ddisp">—</span></div>
-      <input type="date" id="dateInput" onchange="onDate(this.value)">
+      <input type="date" id="dateInput" onchange="onDate(this.value,true)">
       <button class="lock-btn" onclick="lockToCustomer()" title="กลับหน้าลูกค้า" style="width:auto;padding:0 10px;gap:4px;font-size:.78rem;font-weight:700;color:#FFD54F">🛒 ลูกค้า</button>
     </div>
   </div>
@@ -1294,6 +1296,28 @@ function initFirebase() {
       shopStatus = snap.val() || {soldOut:false, preorderOnly:false};
       localStorage.setItem('crShopStatus', JSON.stringify(shopStatus));
       applyShopStatus();
+    });
+
+    // ── Menu Custom Prices (real-time sync ข้ามอุปกรณ์) ──
+    db.ref('croffle/menuCustom').on('value', function(snap) {
+      var remote = snap.val();
+      if (remote && typeof remote === 'object') {
+        localStorage.setItem('crMenuCustom', JSON.stringify(remote));
+        MENUS.forEach(function(m) {
+          if (remote[m.id]) {
+            if (remote[m.id].sell != null) m.sell = +remote[m.id].sell;
+            if (remote[m.id].cost != null) m.cost = +remote[m.id].cost;
+          }
+        });
+        // rebuild UI ราคาหน้าลูกค้าให้ sync ทันที
+        buildOrderMenus();
+        buildSalesCards();
+        applyMenuStatusToCustomer();
+        if (document.getElementById('sc-settings') &&
+            document.getElementById('sc-settings').classList.contains('active')) {
+          renderMenuSettings();
+        }
+      }
     });
 
     // ── Daily Cost Overrides (real-time sync ข้ามอุปกรณ์) ──
@@ -2194,13 +2218,17 @@ function calcSales() {
 }
 
 function pickDate() {
-  // Handled natively by <label> overlay — iOS Safari compatible
   const inp = document.getElementById('dateInput');
-  if (inp && inp.click) inp.click();
+  if (!inp) return;
+  // ตั้งค่าวันปัจจุบันให้ input ก่อนเปิด เพื่อให้ iOS/Android เปิดตรงวันที่เลือกอยู่
+  if (!inp.value) inp.value = localDateStr();
+  // iOS Safari: ต้องเรียก click() ใน user gesture เท่านั้น
+  try { inp.showPicker(); } catch(e) { inp.click(); }
 }
-function onDate(v) {
+function onDate(v, _fromUser) {
   if (!v) return;
   summaryDateStr = v;  // sync summary date with topbar date picker
+  calDate = v;         // sync calendar tab
   const [y,m,d] = v.split('-');
   const mn = ['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
   document.getElementById('ddisp').textContent = `${+d} ${mn[+m]} ${+y+543}`;
@@ -2208,6 +2236,8 @@ function onDate(v) {
   if (document.getElementById('v-own').style.display !== 'none') {
     syncSalesFromAccepted();
   }
+  // ไปแท็บปฏิทินเฉพาะเมื่อ user กดเลือกเอง (ไม่ใช่ตอน init)
+  if (_fromUser) tab('calendar');
 }
 function tab(t) {
   ['orders','summary','hist','calendar','settings'].forEach(x => {
@@ -3108,6 +3138,8 @@ function saveMenuSettings() {
   });
   if (!ok) { toast('⚠️ กรุณาตรวจสอบตัวเลข'); return; }
   localStorage.setItem('crMenuCustom', JSON.stringify(custom));
+  // sync ราคา/ต้นทุนไปทุกอุปกรณ์ผ่าน Firebase
+  if (fbReady && db) db.ref('croffle/menuCustom').set(custom);
 
   // ✅ rebuild หน้าลูกค้า — ราคาใหม่จะแสดงทันที
   ['c-croffle','c-drink','c-khanom'].forEach(function(id){
@@ -3138,6 +3170,7 @@ function saveMenuSettings() {
 function resetMenuSettings() {
   customConfirm('คืนค่าราคาและต้นทุนเริ่มต้น?', function() {
     localStorage.removeItem('crMenuCustom');
+    if (fbReady && db) db.ref('croffle/menuCustom').remove();
     location.reload();
   }, '🔄 รีเซ็ต', 'กลับ');
 }
@@ -3660,20 +3693,33 @@ function getDatesWithOrders() {
   return [...dates].sort().reverse();
 }
 
+function _syncTopbarDate(dateStr) {
+  var inp = document.getElementById('dateInput');
+  if (inp) inp.value = dateStr;
+  var mn = ['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+  var p = dateStr.split('-');
+  var el = document.getElementById('ddisp');
+  if (el) el.textContent = (+p[2]) + ' ' + mn[+p[1]] + ' ' + (+p[0]+543);
+  summaryDateStr = dateStr;
+}
+
 function calShift(delta) {
   const d = new Date(calDate + 'T12:00:00'); // noon to avoid timezone flip
   d.setDate(d.getDate() + delta);
   calDate = localDateStr(d);
+  _syncTopbarDate(calDate);
   renderCalendar();
 }
 
 function calGoToday() {
   calDate = localDateStr();
+  _syncTopbarDate(calDate);
   renderCalendar();
 }
 
 function calSelectDate(dateStr) {
   calDate = dateStr;
+  _syncTopbarDate(calDate);
   renderCalendar();
 }
 
