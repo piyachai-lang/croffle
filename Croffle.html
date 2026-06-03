@@ -1224,21 +1224,55 @@ function initFirebase() {
     // version เก็บแยกที่ croffle/menuCustomVer (ไม่ปะปนกับราคา)
     // ถ้า version เก่า → ลบข้อมูลราคาเก่าออกทั้งหมด (รวม c5=60 ที่ค้างอยู่)
     // หลังจากนั้น Firebase จะว่าง → ทุกเครื่องใช้ code default (c5=65) อัตโนมัติ
-    var PRICE_SCHEMA_VER = 4;
-    db.ref('croffle/menuCustomVer').once('value', function(snap) {
-      if ((snap.val() || 0) < PRICE_SCHEMA_VER) {
-        db.ref('croffle/menuCustom').remove();          // ลบราคาเก่าทิ้งทั้งหมด
-        db.ref('croffle/menuCustomVer').set(PRICE_SCHEMA_VER); // บันทึก version ใหม่
-        localStorage.removeItem('crMenuCustom');        // ล้าง localStorage ด้วย
-        // reset MENUS ทันทีโดยไม่รอ Firebase listener
+    // ── Price Schema Migration + Listener ──────────────────────────────────
+    // listener ต้องอยู่ใน once() callback เท่านั้น → migration รันก่อนเสมอ
+    // ป้องกัน: Firebase ส่งราคาเก่า (c5=60) เข้ามาก่อน migration จะล้างออก
+    var PRICE_SCHEMA_VER = 5;
+    db.ref('croffle/menuCustomVer').once('value', function(verSnap) {
+      if ((verSnap.val() || 0) < PRICE_SCHEMA_VER) {
+        db.ref('croffle/menuCustom').remove();
+        db.ref('croffle/menuCustomVer').set(PRICE_SCHEMA_VER);
+        localStorage.removeItem('crMenuCustom');
         MENUS.forEach(function(m) {
           m.sell = MENUS_CODE_DEFAULT[m.id].sell;
           m.cost = MENUS_CODE_DEFAULT[m.id].cost;
         });
-        buildOrderMenus();
-        buildSalesCards();
-        applyMenuStatusToCustomer();
+        buildOrderMenus(); buildSalesCards(); applyMenuStatusToCustomer();
       }
+      // register listener หลัง migration → ไม่มีทางรับราคาเก่าจาก Firebase
+      db.ref('croffle/menuCustom').on('value', function(snap) {
+        var overrides = snap.val() || {};
+        MENUS.forEach(function(m) {
+          m.sell = MENUS_CODE_DEFAULT[m.id].sell;
+          m.cost = MENUS_CODE_DEFAULT[m.id].cost;
+        });
+        var validIds = MENUS.map(function(m){ return m.id; });
+        MENUS.forEach(function(m) {
+          var ov = overrides[m.id];
+          if (ov && typeof ov === 'object') {
+            if (ov.sell != null) m.sell = +ov.sell;
+            if (ov.cost != null) m.cost = +ov.cost;
+          }
+        });
+        var clean = {};
+        validIds.forEach(function(id){ if (overrides[id]) clean[id] = overrides[id]; });
+        localStorage.setItem('crMenuCustom', JSON.stringify(clean));
+        buildOrderMenus(); buildSalesCards(); applyMenuStatusToCustomer();
+        var _td = localDateStr();
+        updateHistFromOrders(_td);
+        if (document.getElementById('sc-summary') &&
+            document.getElementById('sc-summary').classList.contains('active')) {
+          if (typeof summaryMode !== 'undefined') {
+            if (summaryMode === 'day') loadSummaryDate(summaryDateStr || _td);
+            else if (summaryMode === 'week') loadSummaryWeek(summaryWeekStart || summaryDateStr || _td);
+            else loadSummaryMonth(summaryMonthStr || _td.slice(0,7));
+          }
+        }
+        if (document.getElementById('sc-settings') &&
+            document.getElementById('sc-settings').classList.contains('active')) {
+          renderMenuSettings();
+        }
+      });
     });
 
     // ── Listen: pending orders (real-time, ทุกอุปกรณ์) ──
@@ -1324,49 +1358,6 @@ function initFirebase() {
       shopStatus = snap.val() || {soldOut:false, preorderOnly:false};
       localStorage.setItem('crShopStatus', JSON.stringify(shopStatus));
       applyShopStatus();
-    });
-
-    // ── Menu Custom Prices (real-time sync ข้ามอุปกรณ์) ──
-    // Firebase เก็บเฉพาะ "override" (ราคาที่เจ้าของตั้งต่างจาก code default)
-    // ถ้า Firebase ว่าง → ใช้ code default ทั้งหมด (c5=65 ฯลฯ)
-    db.ref('croffle/menuCustom').on('value', function(snap) {
-      var overrides = snap.val() || {};
-      // 1) reset MENUS กลับเป็น code default ก่อนเสมอ
-      MENUS.forEach(function(m) {
-        m.sell = MENUS_CODE_DEFAULT[m.id].sell;
-        m.cost = MENUS_CODE_DEFAULT[m.id].cost;
-      });
-      // 2) apply เฉพาะ override ที่เจ้าของตั้งไว้จริง (ข้าม field ที่ไม่ใช่ menu id)
-      var validIds = MENUS.map(function(m){ return m.id; });
-      MENUS.forEach(function(m) {
-        var ov = overrides[m.id];
-        if (ov && typeof ov === 'object') {
-          if (ov.sell != null) m.sell = +ov.sell;
-          if (ov.cost != null) m.cost = +ov.cost;
-        }
-      });
-      // 3) save เฉพาะ override ลง localStorage
-      var clean = {};
-      validIds.forEach(function(id){ if (overrides[id]) clean[id] = overrides[id]; });
-      localStorage.setItem('crMenuCustom', JSON.stringify(clean));
-      // 4) rebuild UI ทุกส่วนทันที
-      buildOrderMenus();
-      buildSalesCards();
-      applyMenuStatusToCustomer();
-      var _td = localDateStr();
-      updateHistFromOrders(_td);
-      if (document.getElementById('sc-summary') &&
-          document.getElementById('sc-summary').classList.contains('active')) {
-        if (typeof summaryMode !== 'undefined') {
-          if (summaryMode === 'day') loadSummaryDate(summaryDateStr || _td);
-          else if (summaryMode === 'week') loadSummaryWeek(summaryWeekStart || summaryDateStr || _td);
-          else loadSummaryMonth(summaryMonthStr || _td.slice(0,7));
-        }
-      }
-      if (document.getElementById('sc-settings') &&
-          document.getElementById('sc-settings').classList.contains('active')) {
-        renderMenuSettings();
-      }
     });
 
     // ── Daily Cost Overrides (real-time sync ข้ามอุปกรณ์) ──
