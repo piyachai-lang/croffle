@@ -3139,12 +3139,25 @@ function selectManualPaid(paid) {
 // ════════════════════════════════════════
 function loadMenuCustom() {
   var saved = JSON.parse(localStorage.getItem('crMenuCustom') || '{}');
+  var localChanged = false;
   MENUS.forEach(function(m) {
     if (saved[m.id]) {
+      var def = MENUS_CODE_DEFAULT[m.id] || {};
+      // ── migration: ถ้า localStorage มีราคาต่ำกว่า code default ใหม่ → ใช้ code default
+      if (saved[m.id].sell != null && +saved[m.id].sell < (def.sell || 0)) {
+        saved[m.id].sell = def.sell;
+        localChanged = true;
+      }
+      if (saved[m.id].cost != null && +saved[m.id].cost < (def.cost || 0)) {
+        saved[m.id].cost = def.cost;
+        localChanged = true;
+      }
       if (saved[m.id].sell != null) m.sell = +saved[m.id].sell;
       if (saved[m.id].cost != null) m.cost = +saved[m.id].cost;
     }
   });
+  // อัปเดต localStorage ให้ sync กับค่าที่แก้แล้ว
+  if (localChanged) localStorage.setItem('crMenuCustom', JSON.stringify(saved));
 }
 
 function renderMenuSettings() {
