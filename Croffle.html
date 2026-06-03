@@ -2,6 +2,9 @@
 <html lang="th">
 <head>
 <meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <link rel="manifest" href="manifest.json">
 
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
@@ -3134,12 +3137,16 @@ function selectManualPaid(paid) {
 // MENU SETTINGS (ปรับราคา/ต้นทุน)
 // ════════════════════════════════════════
 function loadMenuCustom() {
-  // 1) reset MENUS กลับเป็น code default ก่อนเสมอ (ป้องกัน stale localStorage ทับค่าใหม่)
+  // เสมอ reset กลับ code default ก่อน
   MENUS.forEach(function(m) {
     m.sell = MENUS_CODE_DEFAULT[m.id].sell;
     m.cost = MENUS_CODE_DEFAULT[m.id].cost;
   });
-  // 2) apply เฉพาะ override จาก localStorage (ราคาที่เจ้าของตั้งต่างจาก default)
+  // ถ้า Firebase ถูกตั้งค่าไว้ → ข้าม localStorage ทั้งหมด
+  // Firebase listener จะ apply override ที่ถูกต้องทีหลัง
+  // ป้องกันกรณี localStorage มีราคาเก่า (เช่น c5=60) ทับ code default ใหม่
+  if (typeof FB_CONFIG !== 'undefined' && FB_CONFIG.databaseURL) return;
+  // ไม่มี Firebase → fallback ใช้ localStorage
   var overrides = JSON.parse(localStorage.getItem('crMenuCustom') || '{}');
   MENUS.forEach(function(m) {
     var ov = overrides[m.id];
