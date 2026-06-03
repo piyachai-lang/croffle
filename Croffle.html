@@ -1220,6 +1220,22 @@ function initFirebase() {
     fbReady = true;
     document.getElementById('fb-banner').style.display = 'none';
 
+    // ── บังคับ sync ราคา code default ขึ้น Firebase ทันที ──
+    // ป้องกันกรณี Firebase มีค่าเก่าค้างอยู่ (เช่น c5.sell=60 แทนที่จะเป็น 65)
+    db.ref('croffle/menuCustom').once('value', function(snap) {
+      var stored = snap.val() || {};
+      var patch = {};
+      var needPatch = false;
+      MENUS.forEach(function(m) {
+        var def = MENUS_CODE_DEFAULT[m.id];
+        var s = stored[m.id] || {};
+        if (s.sell == null || +s.sell < def.sell) { patch[m.id] = Object.assign({}, s, { sell: def.sell }); needPatch = true; }
+        else patch[m.id] = s;
+        if (patch[m.id].cost == null || +patch[m.id].cost < def.cost) { patch[m.id].cost = def.cost; needPatch = true; }
+      });
+      if (needPatch) db.ref('croffle/menuCustom').set(patch);
+    });
+
     // ── Listen: pending orders (real-time, ทุกอุปกรณ์) ──
     db.ref('croffle/pending').on('value', snap => {
       const data = snap.val() || {};
