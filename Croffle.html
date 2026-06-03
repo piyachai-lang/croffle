@@ -753,6 +753,7 @@ input, select, textarea {font-size: 16px !important}
     <div class="topbar-left">
       <span class="topbar-logo">🥐</span>
       <span class="topbar-title">จัดการร้าน</span>
+      <span id="dbg-ver" style="font-size:.6rem;color:rgba(255,255,255,.35);margin-left:4px">v?</span>
     </div>
     <div style="display:flex;align-items:center;gap:8px">
       <div id="fb-dot" title="กำลังเชื่อมต่อ Firebase..."></div>
@@ -3630,9 +3631,11 @@ function autoSaveDay() {
 window.onload = () => {
   // ── App version check: ล้าง localStorage เก่าเมื่อ code อัปเดต ──────────
   // เปลี่ยน APP_VERSION ทุกครั้งที่ราคา default ในโค้ดเปลี่ยน
-  var APP_VERSION = 'v20260603-price65';
+  var APP_VERSION = 'v20260603-c';
+  var el = document.getElementById('dbg-ver');
+  if (el) el.textContent = APP_VERSION;
+  // ล้าง crMenuCustom เก่าออกทุกครั้งที่ version เปลี่ยน
   if (localStorage.getItem('appVersion') !== APP_VERSION) {
-    // โค้ดใหม่โหลดครั้งแรก → ล้างราคาเก่าออกจาก localStorage ทั้งหมด
     localStorage.removeItem('crMenuCustom');
     localStorage.setItem('appVersion', APP_VERSION);
   }
