@@ -1263,13 +1263,13 @@ function initFirebase() {
         m.sell = MENUS_CODE_DEFAULT[m.id].sell;
         m.cost = MENUS_CODE_DEFAULT[m.id].cost;
       });
-      // 2) apply เฉพาะ override ที่ >= code default (ป้องกันค่าเก่า/ผิด)
+      // 2) apply override ทุกค่าที่เจ้าของตั้งไว้ (ไม่จำกัดขั้นต่ำ)
       MENUS.forEach(function(m) {
         var ov = overrides[m.id];
         var def = MENUS_CODE_DEFAULT[m.id];
         if (ov && typeof ov === 'object') {
-          if (ov.sell != null && +ov.sell >= def.sell) m.sell = +ov.sell;
-          if (ov.cost != null && +ov.cost >= def.cost) m.cost = +ov.cost;
+          if (ov.sell != null && +ov.sell >= 0) m.sell = +ov.sell;
+          if (ov.cost != null && +ov.cost >= 0) m.cost = +ov.cost;
         }
       });
       // 3) save ลง localStorage
@@ -1704,8 +1704,8 @@ function buildOrderMenus() {
           ${isSweet ? qtyHtml : ''}
         </div>
       </div>`;
-    document.getElementById(m.cat === 'croffle' ? 'c-croffle' : m.cat === 'khanom' ? 'c-khanom' : 'c-drink')
-      .insertAdjacentHTML('beforeend', html);
+    var _cat = m.cat === 'croffle' ? 'c-croffle' : m.cat === 'khanom' ? 'c-khanom' : 'c-drink'; var _el = document.getElementById(_cat); if (_el) _el.insertAdjacentHTML('beforeend', html);
+
   });
 }
 function chgOrder(id, d, sweetSuf) {
@@ -3218,9 +3218,8 @@ function saveMenuSettings() {
   var overrides = {};
   MENUS.forEach(function(m) {
     var def = MENUS_CODE_DEFAULT[m.id];
-    // บังคับให้ราคาไม่ต่ำกว่า code default (ป้องกัน old-code device เขียน 60 กลับ Firebase)
-    if (m.sell < def.sell) m.sell = def.sell;
-    if (m.cost < def.cost) m.cost = def.cost;
+    // ไม่บังคับ floor — เจ้าของร้านสามารถตั้งราคาต่ำกว่า default ได้
+    // (เอา floor check ออก เพื่อให้ลดราคาได้จริง)
     // เก็บเฉพาะ override ที่ต่างจาก default จริงๆ
     if (Math.abs(m.sell - def.sell) > 0.001 || Math.abs(m.cost - def.cost) > 0.001) {
       overrides[m.id] = { sell: m.sell, cost: m.cost };
@@ -3624,7 +3623,7 @@ function autoSaveDay() {
 window.onload = () => {
   // ── App version check: ล้าง localStorage เก่าเมื่อ code อัปเดต ──────────
   // เปลี่ยน APP_VERSION ทุกครั้งที่ราคา default ในโค้ดเปลี่ยน
-  var APP_VERSION = 'v20260605-a';
+  var APP_VERSION = 'v20260606-a';
   var el = document.getElementById('dbg-ver');
   if (el) el.textContent = APP_VERSION;
   // ล้าง crMenuCustom เก่าออกทุกครั้งที่ version เปลี่ยน
