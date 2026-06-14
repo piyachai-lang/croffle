@@ -2412,32 +2412,59 @@ function deleteEntry(date) {
   saveHist(getHist().filter(x=>x.date!==date));
   renderHist(); if(chartsReady) updWeekChart(); toast('🗑️ ลบแล้ว');
 }
+var _histFetchPending = false; // ป้องกัน Firebase fetch วนซ้ำ
 function renderHist() {
-  // ① ถ้า orderHistoryCache ว่าง (Firebase ยังไม่โหลด) → ดึงข้อมูลตรงจาก Firebase แล้ว re-render
-  if (Object.keys(orderHistoryCache).length === 0 && typeof fbReady !== 'undefined' && fbReady && db) {
+  // ① cache ว่าง + Firebase พร้อม + ยังไม่ได้ fetch → ดึงข้อมูลจาก Firebase
+  if (Object.keys(orderHistoryCache).length === 0 && fbReady && db && !_histFetchPending) {
+    _histFetchPending = true;
     var _hl = document.getElementById('hist-list');
     if (_hl) _hl.innerHTML = '<div class="empty">⏳ กำลังโหลดข้อมูล...</div>';
     db.ref('croffle/orderHistory').once('value', function(snap) {
+      _histFetchPending = false;
       var _fh = (snap && snap.val()) || {};
       Object.keys(_fh).forEach(function(k) {
         if (_fh[k] && typeof _fh[k] === 'object') orderHistoryCache[k] = _fh[k];
       });
-      renderHist(); // re-render หลังจากได้ข้อมูล
+      _renderHistData(); // render หลัง fetch (ไม่เรียก renderHist() ตรงๆ เพื่อกัน loop)
     });
     return;
   }
-  // ② crHist ว่างแต่ cache มีข้อมูล → rebuild crHist ก่อน render
+  _renderHistData();
+}
+function _renderHistData() {
+  // ② crHist ว่างแต่ cache มีข้อมูล → ลอง rebuild ผ่าน updateHistFromOrders
   if (getHist().length === 0 && Object.keys(orderHistoryCache).length > 0) {
     var _dates = new Set();
     Object.values(orderHistoryCache).forEach(function(o) {
       if (o && !o.isSummary && o.date) _dates.add(o.date.slice(0,10));
     });
-    _dates.forEach(function(d) { updateHistFromOrders(d); });
+    try { _dates.forEach(function(d) { updateHistFromOrders(d); }); } catch(e) {}
   }
-  const hist=getHist();
+  var hist = getHist();
+  // ③ crHist ยังว่างหลัง rebuild → สร้างตรงจาก orderHistoryCache (bypass updateHistFromOrders)
+  if (!hist.length && Object.keys(orderHistoryCache).length > 0) {
+    var _dm = {};
+    Object.values(orderHistoryCache).forEach(function(o) {
+      if (o.isSummary || !o.date) return;
+      var d = o.date.slice(0,10);
+      if (!_dm[d]) _dm[d] = { date:d, totRev:0, totCost:0, totBox:0, totGp:0, rows:[], fromOrders:true };
+      var _it = Array.isArray(o.items) ? o.items : Object.values(o.items || {});
+      _it.forEach(function(it) {
+        if (!it || !it.id) return;
+        var q = +(it.qty) || 0;
+        _dm[d].totRev  += (it.sell  != null ? +it.sell  : 0) * q;
+        _dm[d].totCost += (it.cost  != null ? +it.cost  : 0) * q;
+        _dm[d].totBox  += q;
+      });
+    });
+    Object.values(_dm).forEach(function(e) { e.totGp = e.totRev - e.totCost; });
+    hist = Object.values(_dm).sort(function(a,b){ return b.date.localeCompare(a.date); });
+    if (hist.length) saveHist(hist); // บันทึกลง crHist เพื่อใช้ครั้งหน้า
+  }
+  // ④ Render
   document.getElementById('hs-d').textContent=hist.length;
-  document.getElementById('hs-r').textContent='฿'+fmt(hist.reduce((s,h)=>s+h.totRev,0));
-  document.getElementById('hs-g').textContent='฿'+fmt(hist.reduce((s,h)=>s+h.totGp,0));
+  document.getElementById('hs-r').textContent='฿'+fmt(hist.reduce(function(s,h){return s+h.totRev;},0));
+  document.getElementById('hs-g').textContent='฿'+fmt(hist.reduce(function(s,h){return s+h.totGp;},0));
   const list=document.getElementById('hist-list');
   if(!hist.length){list.innerHTML=`<div class="empty">📭 ยังไม่มีข้อมูล</div>`;return;}
   list.innerHTML=hist.map(h=>{
@@ -3644,7 +3671,7 @@ function autoSaveDay() {
 window.onload = () => {
   // ── App version check: ล้าง localStorage เก่าเมื่อ code อัปเดต ──────────
   // เปลี่ยน APP_VERSION ทุกครั้งที่ราคา default ในโค้ดเปลี่ยน
-  var APP_VERSION = 'v20260614-b';
+  var APP_VERSION = 'v20260614-c';
   var el = document.getElementById('dbg-ver');
   if (el) el.textContent = APP_VERSION;
   // ล้าง crMenuCustom เก่าออกทุกครั้งที่ version เปลี่ยน
