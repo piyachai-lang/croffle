@@ -855,6 +855,7 @@ input, select, textarea {font-size: 16px !important}
       </div>
       <div class="wcbox"><h3>📅 กำไร 7 วันล่าสุด</h3><div style="position:relative;height:160px"><canvas id="weekChart"></canvas></div></div>
       <div id="hist-list"></div>
+      <button onclick="rebuildHistFromFirebase()" style="display:block;width:100%;padding:10px;background:var(--ambl);border:none;border-radius:10px;font-size:.82rem;font-weight:700;color:var(--hdr);cursor:pointer;margin-top:8px">🔄 ดึงข้อมูลจาก Firebase ทั้งหมด</button>
       <button class="abtn abtn-clr" style="width:100%;justify-content:center;margin-top:4px" onclick="clearHist()">🗑️ ลบประวัติทั้งหมด</button>
     </div>
 
@@ -1311,27 +1312,16 @@ function initFirebase() {
     db.ref('croffle/accepted').on('value', snap => {
       const data = snap.val() || {};
       // ✅ FIX: ใช้ Object.entries เพื่อ inject Firebase key เป็น id fallback เสมอ
-      var _fbAccArr = Object.entries(data)
+      acceptedCache = Object.entries(data)
         .map(([key, val]) => {
           if (!val || typeof val !== 'object') return null;
           return {...val, id: val.id || key};
         })
-        .filter(Boolean);
-      // ✅ Merge จาก localStorage ถ้า Firebase ส่งกลับมาว่าง
-      // (กรณี Firebase ข้อมูลหายหรือ network issue — "ล้าง" จะ clear LS ด้วยอยู่แล้ว)
-      if (_fbAccArr.length === 0) {
-        try {
-          var _lsAcc = JSON.parse(localStorage.getItem('crAcceptedOrders') || '[]');
-          if (_lsAcc.length > 0) {
-            _fbAccArr = _lsAcc;
-            // recover ขึ้น Firebase
-            _lsAcc.forEach(function(o) { if (o && o.id && db) db.ref('croffle/accepted/' + o.id).set(o); });
-          }
-        } catch(e) {}
-      }
-      acceptedCache = _fbAccArr.sort((a,b) => (b.acceptedTs||0) - (a.acceptedTs||0));
+        .filter(Boolean)
+        .sort((a,b) => (b.acceptedTs||0) - (a.acceptedTs||0));
       // บันทึก history ถาวรทุกครั้งที่ accepted orders อัปเดต
       acceptedCache.forEach(o => { if (o && o.id) saveOrderHistory(o); });
+      localStorage.setItem('crAcceptedOrders', JSON.stringify(acceptedCache));
       renderOrders();
       // sync ยอดขายจาก accepted orders (ทำงานทุกเครื่อง รวมถึงหลัง refresh)
       if (document.getElementById('v-own').style.display !== 'none') {
@@ -2352,8 +2342,30 @@ function tab(t) {
   if (t === 'hist')    { loadOrderHistory(); syncCrHistFromCache(); renderHist(); if(typeof updWeekChart==='function') updWeekChart(); }
   if (t === 'settings') { renderMenuSettings(); }
   if (t === 'orders') {
-    loadOrderHistory(); // refresh from Firebase+localStorage
-    renderOrders();
+    renderOrders(); // render ทันทีด้วย cache ที่มีอยู่
+    // Fresh fetch จาก Firebase เพื่อดึง pending/accepted ล่าสุด
+    if (fbReady && db) {
+      Promise.all([
+        db.ref('croffle/pending').once('value'),
+        db.ref('croffle/accepted').once('value')
+      ]).then(function(snaps) {
+        var pSnap = snaps[0], aSnap = snaps[1];
+        var pData = (pSnap && pSnap.val()) || {};
+        var aData = (aSnap && aSnap.val()) || {};
+        pendingCache = Object.entries(pData)
+          .map(function(_ref) { var k=_ref[0],v=_ref[1]; return v && typeof v==='object' ? Object.assign({},v,{id:v.id||k}) : null; })
+          .filter(Boolean)
+          .sort(function(a,b){ return (b.id||'').localeCompare(a.id||''); });
+        var _newAcc = Object.entries(aData)
+          .map(function(_ref) { var k=_ref[0],v=_ref[1]; return v && typeof v==='object' ? Object.assign({},v,{id:v.id||k}) : null; })
+          .filter(Boolean)
+          .sort(function(a,b){ return (b.acceptedTs||0)-(a.acceptedTs||0); });
+        if (_newAcc.length > 0 || Object.keys(aData).length > 0) acceptedCache = _newAcc;
+        localStorage.setItem('crPendingOrders', JSON.stringify(pendingCache));
+        localStorage.setItem('crAcceptedOrders', JSON.stringify(acceptedCache));
+        renderOrders();
+      }).catch(function(){});
+    }
   }
   if (t === 'calendar') {
     loadOrderHistory();
@@ -2435,6 +2447,33 @@ function deleteEntry(date) {
   saveHist(getHist().filter(x=>x.date!==date));
   renderHist(); if(chartsReady) updWeekChart(); toast('🗑️ ลบแล้ว');
 }
+// ดึงข้อมูลทั้งหมดจาก Firebase แล้ว rebuild crHist ใหม่ทั้งหมด
+function rebuildHistFromFirebase() {
+  if (!fbReady || !db) { toast('Firebase ยังไม่พร้อม'); return; }
+  var _hl = document.getElementById('hist-list');
+  if (_hl) _hl.innerHTML = '<div class="empty">⏳ กำลังดึงข้อมูลจาก Firebase...</div>';
+  db.ref('croffle/orderHistory').once('value', function(snap) {
+    var fbData = (snap && snap.val()) || {};
+    var count = Object.keys(fbData).length;
+    if (!count) { toast('ไม่พบข้อมูลใน Firebase'); _renderHistData(); return; }
+    // เพิ่มเข้า orderHistoryCache ทั้งหมด (ไม่ replace — additive)
+    Object.keys(fbData).forEach(function(k) {
+      if (fbData[k] && typeof fbData[k] === 'object' && !fbData[k].isSummary) {
+        orderHistoryCache[k] = fbData[k];
+      }
+    });
+    localStorage.setItem('crOrderHistory', JSON.stringify(orderHistoryCache));
+    // rebuild crHist จากทุก date ที่มีใน Firebase
+    var _dates = new Set();
+    Object.values(orderHistoryCache).forEach(function(o) {
+      if (o && !o.isSummary && o.date) _dates.add(o.date.slice(0,10));
+    });
+    _dates.forEach(function(d) { try { updateHistFromOrders(d); } catch(e) {} });
+    toast('✅ ดึงข้อมูล ' + count + ' รายการ | ' + _dates.size + ' วัน');
+    _renderHistData();
+  });
+}
+
 var _histFetchPending = false; // ป้องกัน Firebase fetch วนซ้ำ
 function renderHist() {
   // ① ถ้า cache ว่าง → ลอง restore จาก localStorage ที่ Firebase เคย save ไว้
@@ -3717,7 +3756,7 @@ function autoSaveDay() {
 window.onload = () => {
   // ── App version check: ล้าง localStorage เก่าเมื่อ code อัปเดต ──────────
   // เปลี่ยน APP_VERSION ทุกครั้งที่ราคา default ในโค้ดเปลี่ยน
-  var APP_VERSION = 'v20260614-g';
+  var APP_VERSION = 'v20260614-h';
   var el = document.getElementById('dbg-ver');
   if (el) el.textContent = APP_VERSION;
   // ล้าง crMenuCustom เก่าออกทุกครั้งที่ version เปลี่ยน
