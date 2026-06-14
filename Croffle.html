@@ -856,6 +856,7 @@ input, select, textarea {font-size: 16px !important}
       <div class="wcbox"><h3>📅 กำไร 7 วันล่าสุด</h3><div style="position:relative;height:160px"><canvas id="weekChart"></canvas></div></div>
       <div id="hist-list"></div>
       <button onclick="rebuildHistFromFirebase()" style="display:block;width:100%;padding:10px;background:var(--ambl);border:none;border-radius:10px;font-size:.82rem;font-weight:700;color:var(--hdr);cursor:pointer;margin-top:8px">🔄 ดึงข้อมูลจาก Firebase ทั้งหมด</button>
+      <button onclick="showDiagnostics()" style="display:block;width:100%;padding:10px;background:#2a2a3a;border:none;border-radius:10px;font-size:.82rem;font-weight:700;color:#aaa;cursor:pointer;margin-top:4px">🔍 ตรวจสอบข้อมูล (Diagnostics)</button>
       <button class="abtn abtn-clr" style="width:100%;justify-content:center;margin-top:4px" onclick="clearHist()">🗑️ ลบประวัติทั้งหมด</button>
     </div>
 
@@ -2506,6 +2507,92 @@ function rebuildHistFromFirebase() {
 }
 
 // ════════════════════════════════════════
+// DIAGNOSTICS
+// ════════════════════════════════════════
+function showDiagnostics() {
+  var _hl = document.getElementById('hist-list');
+  if (_hl) _hl.innerHTML = '<div class="empty">⏳ กำลังตรวจสอบ...</div>';
+
+  // ข้อมูลจาก localStorage
+  var lsOrders = {};
+  try { lsOrders = JSON.parse(localStorage.getItem('crOrderHistory') || '{}'); } catch(e) {}
+  var lsDates = new Set();
+  Object.values(lsOrders).forEach(function(o) {
+    if (o && !o.isSummary && o.date) lsDates.add(o.date.slice(0,10));
+  });
+  var lsDatesSorted = Array.from(lsDates).sort();
+
+  var crHist = [];
+  try { crHist = JSON.parse(localStorage.getItem('crHist') || '[]'); } catch(e) {}
+  var crHistDates = crHist.map(function(h) { return h.date; }).sort();
+
+  // ถ้าไม่มี Firebase ให้แสดงแค่ localStorage
+  function renderDiag(fbDates, fbErr) {
+    var html = '<div style="padding:12px;font-size:.8rem;line-height:1.8">';
+    html += '<b style="font-size:.9rem">🔍 ผลการตรวจสอบ</b><br><br>';
+
+    // Firebase status
+    if (fbErr) {
+      html += '❌ <b>Firebase:</b> ' + fbErr + '<br><br>';
+    } else {
+      html += '✅ <b>Firebase orderHistory:</b> ' + fbDates.length + ' วัน<br>';
+      if (fbDates.length) html += '<span style="color:#aaa;font-size:.75rem">' + fbDates[0] + ' → ' + fbDates[fbDates.length-1] + '</span><br><br>';
+      else html += '<br>';
+    }
+
+    // localStorage crOrderHistory
+    html += '💾 <b>localStorage (raw orders):</b> ' + Object.keys(lsOrders).length + ' รายการ | ' + lsDatesSorted.length + ' วัน<br>';
+    if (lsDatesSorted.length) html += '<span style="color:#aaa;font-size:.75rem">' + lsDatesSorted[0] + ' → ' + lsDatesSorted[lsDatesSorted.length-1] + '</span><br><br>';
+
+    // localStorage crHist
+    html += '📋 <b>localStorage crHist:</b> ' + crHistDates.length + ' วัน<br>';
+    if (crHistDates.length) html += '<span style="color:#aaa;font-size:.75rem">' + crHistDates[0] + ' → ' + crHistDates[crHistDates.length-1] + '</span><br><br>';
+
+    // orderHistoryCache (in-memory)
+    var cacheDates = new Set();
+    Object.values(orderHistoryCache).forEach(function(o) {
+      if (o && !o.isSummary && o.date) cacheDates.add(o.date.slice(0,10));
+    });
+    var cacheDatesSorted = Array.from(cacheDates).sort();
+    html += '🧠 <b>Memory cache:</b> ' + Object.keys(orderHistoryCache).length + ' รายการ | ' + cacheDatesSorted.length + ' วัน<br>';
+    if (cacheDatesSorted.length) html += '<span style="color:#aaa;font-size:.75rem">' + cacheDatesSorted[0] + ' → ' + cacheDatesSorted[cacheDatesSorted.length-1] + '</span><br><br>';
+
+    // วันที่ใน localStorage แต่ไม่อยู่ใน Firebase
+    if (!fbErr && fbDates.length > 0) {
+      var fbSet = new Set(fbDates);
+      var lsOnly = lsDatesSorted.filter(function(d) { return !fbSet.has(d); });
+      if (lsOnly.length) {
+        html += '⚠️ <b>วันที่หายจาก Firebase (มีแค่ใน localStorage):</b><br>';
+        html += '<span style="color:#f90;font-size:.75rem">' + lsOnly.join(', ') + '</span><br>';
+        html += '<small style="color:#aaa">→ กด "🔄 ดึงข้อมูล" เพื่อ upload กลับ Firebase</small><br><br>';
+      } else {
+        html += '✅ ข้อมูล localStorage ตรงกับ Firebase ครบ<br><br>';
+      }
+    }
+
+    html += '<b>Firebase status:</b> ' + (fbReady ? '✅ เชื่อมต่อแล้ว' : '❌ ไม่ได้เชื่อมต่อ') + '<br>';
+    html += '</div>';
+    if (_hl) _hl.innerHTML = html;
+  }
+
+  if (!fbReady || !db) {
+    renderDiag([], 'ยังไม่เชื่อมต่อ Firebase');
+    return;
+  }
+
+  db.ref('croffle/orderHistory').once('value', function(snap) {
+    var fbData = (snap && snap.val()) || {};
+    var fbDates = new Set();
+    Object.values(fbData).forEach(function(o) {
+      if (o && !o.isSummary && o.date) fbDates.add(o.date.slice(0,10));
+    });
+    renderDiag(Array.from(fbDates).sort(), null);
+  }, function(err) {
+    renderDiag([], 'Permission Denied หรือ Network Error — ' + (err && err.message || String(err)));
+  });
+}
+
+// ════════════════════════════════════════
 // HISTORY TAB RENDERER
 // ════════════════════════════════════════
 function renderHist() {
@@ -3760,7 +3847,7 @@ function autoSaveDay() {
 window.onload = () => {
   // ── App version check: ล้าง localStorage เก่าเมื่อ code อัปเดต ──────────
   // เปลี่ยน APP_VERSION ทุกครั้งที่ราคา default ในโค้ดเปลี่ยน
-  var APP_VERSION = 'v20260614-m';
+  var APP_VERSION = 'v20260614-n';
   var el = document.getElementById('dbg-ver');
   if (el) el.textContent = APP_VERSION;
   // ล้าง crMenuCustom เก่าออกทุกครั้งที่ version เปลี่ยน
