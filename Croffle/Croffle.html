@@ -2413,6 +2413,14 @@ function deleteEntry(date) {
   renderHist(); if(chartsReady) updWeekChart(); toast('🗑️ ลบแล้ว');
 }
 function renderHist() {
+  // ✅ Guard: ถ้า crHist ว่างแต่ orderHistoryCache มีข้อมูล → rebuild ก่อน render
+  if (getHist().length === 0 && Object.keys(orderHistoryCache).length > 0) {
+    var _dates = new Set();
+    Object.values(orderHistoryCache).forEach(function(o) {
+      if (o && !o.isSummary && o.date) _dates.add(o.date.slice(0,10));
+    });
+    _dates.forEach(function(d) { updateHistFromOrders(d); });
+  }
   const hist=getHist();
   document.getElementById('hs-d').textContent=hist.length;
   document.getElementById('hs-r').textContent='฿'+fmt(hist.reduce((s,h)=>s+h.totRev,0));
@@ -3623,7 +3631,7 @@ function autoSaveDay() {
 window.onload = () => {
   // ── App version check: ล้าง localStorage เก่าเมื่อ code อัปเดต ──────────
   // เปลี่ยน APP_VERSION ทุกครั้งที่ราคา default ในโค้ดเปลี่ยน
-  var APP_VERSION = 'v20260606-c';
+  var APP_VERSION = 'v20260614-a';
   var el = document.getElementById('dbg-ver');
   if (el) el.textContent = APP_VERSION;
   // ล้าง crMenuCustom เก่าออกทุกครั้งที่ version เปลี่ยน

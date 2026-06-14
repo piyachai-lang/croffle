@@ -1,0 +1,845 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Croffle">
+<meta name="theme-color" content="#3D1F07">
+<title>🥐 Croffle & ขนมจีน</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;font-size:16px;color:#212121;background:#EDE0D0}
+:root{
+  --hdr:#3D1F07;--med:#7B4A1E;--amber:#F5A623;--ambl:#FDE9C0;--cream:#FFF8F0;
+  --g:#2E7D32;--gl:#E8F5E9;--r:#C62828;--rl:#FFEBEE;--b:#1565C0;--bl:#DBEAFE;
+  --teal:#00695C;--tl:#E0F2F1;--nav:62px;--top:56px;--shadow:0 2px 14px rgba(61,31,7,.15)
+}
+
+/* ── Shell ─────────────────────────────────────────── */
+.topbar{position:fixed;top:0;left:0;right:0;height:var(--top);background:var(--hdr);
+  display:flex;align-items:center;justify-content:space-between;padding:0 16px;
+  z-index:100;box-shadow:0 2px 10px rgba(0,0,0,.35)}
+.topbar-left{display:flex;align-items:center;gap:10px}
+.topbar-logo{font-size:1.5rem}
+.topbar-title{color:var(--amber);font-size:1.05rem;font-weight:800;letter-spacing:.5px}
+.date-pill{background:rgba(245,166,35,.18);border:1.5px solid rgba(245,166,35,.4);
+  border-radius:20px;padding:5px 13px;color:var(--amber);font-size:.82rem;font-weight:700;cursor:pointer;white-space:nowrap}
+#dateInput{position:absolute;opacity:0;width:0;height:0;pointer-events:none}
+
+.screen-wrap{position:fixed;top:var(--top);bottom:var(--nav);left:0;right:0;
+  overflow-y:auto;-webkit-overflow-scrolling:touch}
+.screen{display:none;padding:14px 14px 10px;min-height:100%}
+.screen.active{display:block}
+
+.bottomnav{position:fixed;bottom:0;left:0;right:0;height:var(--nav);
+  background:var(--hdr);display:flex;z-index:100;box-shadow:0 -2px 12px rgba(0,0,0,.25)}
+.nbtn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:3px;border:none;background:none;color:rgba(255,255,255,.4);cursor:pointer;
+  transition:all .2s;padding-bottom:env(safe-area-inset-bottom,0)}
+.nbtn.active{color:var(--amber)}
+.nbtn .ni{font-size:1.35rem}
+.nbtn .nl{font-size:.63rem;font-weight:700;letter-spacing:.3px}
+
+/* ── Cards ─────────────────────────────────────────── */
+.card{background:#fff;border-radius:14px;padding:16px;margin-bottom:12px;box-shadow:var(--shadow)}
+.ctitle{font-size:.92rem;font-weight:700;color:var(--hdr);margin-bottom:14px;
+  padding-bottom:10px;border-bottom:2px solid var(--ambl);display:flex;align-items:center;gap:7px}
+.section-hdr{border-radius:10px;padding:9px 14px;margin-bottom:8px;
+  font-size:.85rem;font-weight:800;color:#fff;display:flex;align-items:center;gap:7px}
+
+/* ── Total strip ────────────────────────────────────── */
+.strip{background:var(--hdr);border-radius:14px;padding:13px 16px;margin-bottom:10px;
+  display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;box-shadow:var(--shadow)}
+.si{text-align:center}
+.sl{font-size:.62rem;color:rgba(255,255,255,.55);font-weight:700;text-transform:uppercase;letter-spacing:.4px}
+.sv{font-size:1.1rem;font-weight:800;color:var(--amber);margin-top:2px}
+.sv.grn{color:#81C784}.sv.wht{color:#fff}
+
+/* ── Menu card ──────────────────────────────────────── */
+.mcard{background:#fff;border-radius:13px;padding:13px 14px;margin-bottom:9px;
+  display:flex;align-items:center;gap:11px;box-shadow:var(--shadow)}
+.mico{font-size:1.9rem;flex-shrink:0;line-height:1}
+.minfo{flex:1;min-width:0}
+.mname{font-size:.9rem;font-weight:700;color:var(--hdr);line-height:1.3}
+.mtags{display:flex;gap:6px;margin-top:5px;flex-wrap:wrap}
+.tag{font-size:.72rem;border-radius:6px;padding:2px 8px;font-weight:700}
+.tag-g{background:var(--gl);color:var(--g)}
+.tag-r{background:var(--rl);color:var(--r)}
+.tag-b{background:var(--bl);color:var(--b)}
+.tag-a{background:var(--ambl);color:var(--hdr)}
+.qctrl{display:flex;align-items:center;background:#F5F5F5;border-radius:12px;overflow:hidden;flex-shrink:0}
+.qbtn{width:40px;height:42px;border:none;background:none;font-size:1.4rem;font-weight:700;
+  color:var(--hdr);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s}
+.qbtn:active{background:var(--ambl)}
+.qnum{width:46px;height:42px;border:none;background:none;text-align:center;
+  font-size:1.1rem;font-weight:800;color:var(--b);outline:none;-moz-appearance:textfield}
+.qnum::-webkit-outer-spin-button,.qnum::-webkit-inner-spin-button{-webkit-appearance:none}
+
+/* ── Action btns ─────────────────────────────────────── */
+.abtnrow{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.abtn{padding:14px 10px;border:none;border-radius:12px;font-size:.9rem;font-weight:700;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;gap:7px;
+  min-height:50px;transition:all .18s}
+.abtn:active{transform:scale(.97)}
+.abtn-save{background:var(--hdr);color:var(--amber);grid-column:1/-1;font-size:1rem}
+.abtn-clr{background:#F5F5F5;color:var(--hdr)}
+.abtn-exp{background:var(--gl);color:var(--g)}
+
+/* ── KPI grid ────────────────────────────────────────── */
+.kgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.kcard{border-radius:13px;padding:16px 13px;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,.08);transition:transform .2s}
+.kcard:hover{transform:translateY(-2px)}
+.kico{font-size:1.5rem;display:block;margin-bottom:4px}
+.klbl{font-size:.7rem;font-weight:700;opacity:.7}
+.kval{font-size:1.45rem;font-weight:800;display:block;margin:4px 0 2px}
+.kunit{font-size:.68rem;opacity:.65}
+.kfull{grid-column:1/-1}
+.k-rev{background:var(--gl);color:var(--g)}
+.k-cost{background:var(--rl);color:var(--r)}
+.k-gp{background:var(--bl);color:var(--b)}
+.k-pct{background:var(--ambl);color:var(--hdr)}
+.k-box{background:#F5F5F5;color:var(--med)}
+
+/* ── Breakdown list ──────────────────────────────────── */
+.brow{display:flex;align-items:center;padding:10px 0;border-bottom:1px solid #f0e6d6;gap:9px}
+.brow:last-child{border-bottom:none}
+.bname{flex:1;font-size:.83rem;font-weight:600;color:var(--hdr)}
+.bqty{font-size:.75rem;color:#999;width:42px;text-align:center}
+.bgp{font-size:.88rem;font-weight:700;color:var(--g);width:68px;text-align:right}
+.bpct{font-size:.74rem;font-weight:700;width:42px;text-align:right}
+.pbar-w{background:#eee;border-radius:4px;height:4px;margin-top:3px;overflow:hidden}
+.pbar{height:100%;background:linear-gradient(90deg,var(--amber),var(--g));border-radius:4px;transition:width .4s}
+
+/* ── Charts ──────────────────────────────────────────── */
+.cbox{background:#fff;border-radius:13px;padding:14px;margin-bottom:12px;box-shadow:var(--shadow)}
+.cbox h3{font-size:.83rem;font-weight:700;color:var(--hdr);margin-bottom:12px;text-align:center}
+.ch{position:relative;height:200px}
+
+/* ── History ─────────────────────────────────────────── */
+.hstats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px}
+.hscard{background:#fff;border-radius:11px;padding:11px 8px;text-align:center;box-shadow:var(--shadow)}
+.hslbl{font-size:.62rem;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:.3px}
+.hsval{font-size:1.05rem;font-weight:800;color:var(--hdr);margin-top:3px}
+
+.hentry{background:#fff;border-radius:12px;padding:14px 15px;margin-bottom:9px;
+  display:flex;align-items:center;gap:11px;box-shadow:var(--shadow);cursor:pointer;transition:all .15s}
+.hentry:active{transform:scale(.99);background:#fdf6ec}
+.hedate{flex:1}
+.heday{font-size:.97rem;font-weight:800;color:var(--hdr)}
+.hebox{font-size:.72rem;color:#999;margin-top:2px}
+.henums{text-align:right}
+.herev{font-size:.77rem;color:var(--med)}
+.hegp{font-size:1.05rem;font-weight:800;color:var(--g)}
+.hepct{font-size:.72rem;font-weight:700;margin-top:1px}
+.hdel{width:36px;height:36px;border:none;background:var(--rl);border-radius:8px;
+  cursor:pointer;font-size:.95rem;color:var(--r);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.empty{text-align:center;color:#bbb;padding:40px 20px;font-size:.88rem;line-height:1.8}
+
+/* ── Detail modal ────────────────────────────────────── */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;
+  display:flex;align-items:flex-end;opacity:0;pointer-events:none;transition:opacity .25s}
+.modal-bg.show{opacity:1;pointer-events:all}
+.modal{background:#fff;border-radius:20px 20px 0 0;width:100%;max-height:80vh;
+  overflow-y:auto;padding:20px 18px 32px;transform:translateY(100%);transition:transform .3s}
+.modal-bg.show .modal{transform:translateY(0)}
+.modal-title{font-size:1.05rem;font-weight:800;color:var(--hdr);margin-bottom:16px;
+  display:flex;align-items:center;justify-content:space-between}
+.modal-close{background:none;border:none;font-size:1.4rem;cursor:pointer;color:#999;padding:0 4px}
+.dtrow{display:flex;justify-content:space-between;align-items:center;
+  padding:9px 0;border-bottom:1px solid #f0e6d6;font-size:.88rem}
+.dtrow:last-child{border-bottom:none}
+.dtname{color:var(--hdr);font-weight:600}
+.dtnums{text-align:right;color:#555}
+
+/* ── Weekly chart card ───────────────────────────────── */
+.wcbox{background:#fff;border-radius:13px;padding:14px;margin-bottom:12px;box-shadow:var(--shadow)}
+.wcbox h3{font-size:.83rem;font-weight:700;color:var(--hdr);margin-bottom:10px}
+
+/* ── Toast ───────────────────────────────────────────── */
+.toast{position:fixed;bottom:calc(var(--nav)+12px);left:50%;
+  transform:translateX(-50%) translateY(20px);background:var(--hdr);color:var(--amber);
+  padding:11px 22px;border-radius:24px;font-weight:700;font-size:.87rem;
+  box-shadow:0 6px 24px rgba(0,0,0,.3);opacity:0;transition:all .3s;
+  z-index:300;white-space:nowrap;pointer-events:none}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* ── Order badge ─────────────────────────────────────── */
+.nbtn{position:relative}
+.nbadge{position:absolute;top:5px;right:calc(50% - 24px);background:var(--r);color:#fff;
+  border-radius:10px;padding:1px 6px;font-size:.58rem;font-weight:800;
+  min-width:18px;text-align:center;line-height:1.5;pointer-events:none}
+
+/* ── Order cards ─────────────────────────────────────── */
+.ocard{background:#fff;border-radius:14px;padding:14px 15px;margin-bottom:11px;box-shadow:var(--shadow)}
+.ocard-hdr{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px}
+.ocust{font-size:.97rem;font-weight:800;color:var(--hdr)}
+.otime{font-size:.75rem;color:#999;margin-top:2px}
+.oitem-row{display:flex;justify-content:space-between;align-items:center;
+  padding:7px 0;border-bottom:1px solid #f0e6d6;font-size:.85rem}
+.oitem-row:last-child{border-bottom:none}
+.oitem-nm{color:var(--hdr);font-weight:600;flex:1}
+.oitem-q{color:#999;font-size:.78rem;width:38px;text-align:center}
+.oitem-pr{color:var(--g);font-weight:700;width:56px;text-align:right}
+.ocard-total{background:var(--ambl);border-radius:9px;padding:9px 13px;margin-top:10px;
+  display:flex;justify-content:space-between;align-items:center}
+.ocard-total-lbl{font-size:.82rem;color:var(--med);font-weight:700}
+.ocard-total-val{font-size:1.1rem;font-weight:800;color:var(--hdr)}
+.ocard-btns{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:11px}
+.obtn{padding:12px 8px;border:none;border-radius:11px;font-size:.88rem;font-weight:700;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;
+  min-height:46px;transition:all .18s}
+.obtn:active{transform:scale(.97)}
+.obtn-acc{background:var(--hdr);color:var(--amber)}
+.obtn-rej{background:var(--rl);color:var(--r)}
+.ord-pulse{animation:pulse-badge .8s ease infinite}
+@keyframes pulse-badge{0%,100%{transform:scale(1)}50%{transform:scale(1.18)}}
+
+/* ── Order section headers & status badges ───────────── */
+.ord-section-hdr{border-radius:9px;padding:6px 12px;font-size:.78rem;font-weight:800;
+  margin-bottom:9px;display:flex;align-items:center;justify-content:space-between}
+.ord-pending{background:var(--rl);color:var(--r)}
+.ord-accepted{background:var(--gl);color:var(--g)}
+.ord-clr-btn{background:none;border:none;color:#aaa;font-size:.75rem;cursor:pointer;
+  padding:2px 6px;border-radius:6px;font-weight:600}
+.ord-clr-btn:active{background:rgba(0,0,0,.08)}
+.ord-badge-done{background:var(--gl);color:var(--g);border-radius:8px;
+  padding:3px 9px;font-size:.72rem;font-weight:700;flex-shrink:0}
+.ord-badge-wait{background:var(--rl);color:var(--r);border-radius:8px;
+  padding:3px 9px;font-size:.72rem;font-weight:700;flex-shrink:0;
+  animation:pulse-badge .9s ease infinite}
+</style>
+</head>
+<body>
+
+<!-- Top bar -->
+<div class="topbar">
+  <div class="topbar-left">
+    <span class="topbar-logo">🥐</span>
+    <span class="topbar-title">Croffle & ขนมจีน</span>
+  </div>
+  <div class="date-pill" onclick="pickDate()">📅 <span id="ddisp">—</span></div>
+  <input type="date" id="dateInput" onchange="onDate(this.value)">
+</div>
+
+<!-- ══ Screen 1: กรอกยอดขาย ══ -->
+<div class="screen-wrap">
+<div class="screen active" id="sc-sales">
+
+  <div class="strip">
+    <div class="si"><div class="sl">รายรับ</div><div class="sv" id="t-r">฿0</div></div>
+    <div class="si"><div class="sl">ต้นทุน</div><div class="sv wht" id="t-c">฿0</div></div>
+    <div class="si"><div class="sl">กำไร</div><div class="sv grn" id="t-g">฿0</div></div>
+  </div>
+
+  <!-- ครอฟเฟิล section -->
+  <div class="section-hdr" style="background:var(--med)">🥐 ครอฟเฟิล</div>
+  <div id="croffle-cards"></div>
+
+  <!-- ขนมจีน section -->
+  <div class="section-hdr" style="background:var(--teal)">🍜 ขนมจีนน้ำเงี้ยว</div>
+  <div id="khanom-cards"></div>
+
+  <div class="abtnrow">
+    <button class="abtn abtn-save" onclick="saveDay()">💾 บันทึกวันนี้</button>
+    <button class="abtn abtn-clr"  onclick="clearDay()">🗑️ ล้าง</button>
+    <button class="abtn abtn-exp"  onclick="exportCSV()">📤 Export CSV</button>
+  </div>
+
+  <p style="text-align:center;font-size:.78rem;color:#aaa;padding-bottom:6px">
+    กด + / − หรือพิมพ์จำนวนได้โดยตรง
+  </p>
+</div>
+
+<!-- ══ Screen 2: สรุปวันนี้ ══ -->
+<div class="screen" id="sc-summary">
+
+  <div class="kgrid">
+    <div class="kcard k-rev kfull">
+      <span class="kico">💰</span><span class="klbl">รายรับรวม</span>
+      <span class="kval" id="k-r">฿0.00</span><span class="kunit">บาท</span>
+    </div>
+    <div class="kcard k-cost">
+      <span class="kico">📦</span><span class="klbl">ต้นทุนรวม</span>
+      <span class="kval" id="k-c">฿0.00</span><span class="kunit">บาท</span>
+    </div>
+    <div class="kcard k-gp">
+      <span class="kico">✨</span><span class="klbl">กำไรสุทธิ</span>
+      <span class="kval" id="k-g">฿0.00</span><span class="kunit">บาท</span>
+    </div>
+    <div class="kcard k-pct">
+      <span class="kico">📈</span><span class="klbl">อัตรากำไร</span>
+      <span class="kval" id="k-p">0%</span><span class="kunit">ของรายรับ</span>
+    </div>
+    <div class="kcard k-box">
+      <span class="kico">🛒</span><span class="klbl">ขายได้</span>
+      <span class="kval" id="k-b">0</span><span class="kunit">กล่อง/ถ้วย</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="ctitle">📊 กำไรแยกเมนู</div>
+    <div id="breakdown"></div>
+  </div>
+
+  <div class="cbox">
+    <h3>📊 รายรับ / ต้นทุน / กำไร แยกเมนู</h3>
+    <div class="ch"><canvas id="barChart"></canvas></div>
+  </div>
+
+  <div class="cbox">
+    <h3>🥧 สัดส่วนกำไรแต่ละเมนู</h3>
+    <div class="ch"><canvas id="pieChart"></canvas></div>
+  </div>
+</div>
+
+<!-- ══ Screen 3: ประวัติ ══ -->
+<div class="screen" id="sc-hist">
+
+  <div class="hstats">
+    <div class="hscard"><div class="hslbl">วันที่บันทึก</div><div class="hsval" id="hs-d">0</div></div>
+    <div class="hscard"><div class="hslbl">รายรับสะสม</div><div class="hsval" id="hs-r" style="font-size:.88rem">฿0</div></div>
+    <div class="hscard"><div class="hslbl">กำไรสะสม</div><div class="hsval" id="hs-g" style="font-size:.88rem;color:var(--g)">฿0</div></div>
+  </div>
+
+  <div class="wcbox">
+    <h3>📅 กำไร 7 วันล่าสุด</h3>
+    <div style="position:relative;height:160px"><canvas id="weekChart"></canvas></div>
+  </div>
+
+  <div id="hist-list"></div>
+
+  <button class="abtn abtn-clr" style="width:100%;justify-content:center;margin-top:4px" onclick="clearHist()">
+    🗑️ ลบประวัติทั้งหมด
+  </button>
+</div>
+<!-- ══ Screen 4: ออเดอร์ ══ -->
+<div class="screen" id="sc-orders">
+  <div id="orders-list"></div>
+</div>
+
+</div><!-- /screen-wrap -->
+
+<!-- Bottom nav -->
+<nav class="bottomnav">
+  <button class="nbtn active" id="nb-sales"   onclick="tab('sales')">
+    <span class="ni">🧾</span><span class="nl">กรอกขาย</span>
+  </button>
+  <button class="nbtn"        id="nb-summary" onclick="tab('summary')">
+    <span class="ni">📊</span><span class="nl">สรุปวันนี้</span>
+  </button>
+  <button class="nbtn"        id="nb-hist"    onclick="tab('hist')">
+    <span class="ni">🗂️</span><span class="nl">ประวัติ</span>
+  </button>
+  <button class="nbtn"        id="nb-orders"  onclick="tab('orders')">
+    <span class="ni">📋</span><span class="nl">ออเดอร์</span>
+    <span class="nbadge" id="ord-badge" style="display:none">0</span>
+  </button>
+</nav>
+
+<!-- Detail modal -->
+<div class="modal-bg" id="modal-bg" onclick="closeModal(event)">
+  <div class="modal" id="modal-body"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── Menu Data ────────────────────────────────────────────────────────
+const MENUS = [
+  { id:'c1', ico:'🍫', name:'ธรรมดา หวานน้อย',  sub:'2 ชิ้น/กล่อง', sell:45, cost:16.61, cat:'croffle' },
+  { id:'c2', ico:'🍫', name:'ธรรมดา หวานปกติ',  sub:'2 ชิ้น/กล่อง', sell:45, cost:16.61, cat:'croffle' },
+  { id:'c3', ico:'🍯', name:'นูเทลา',           sub:'1 ชิ้น/กล่อง', sell:55, cost:22.61, cat:'croffle' },
+  { id:'c4', ico:'🥜', name:'เนยถั่ว',          sub:'1 ชิ้น/กล่อง', sell:55, cost:18.04, cat:'croffle' },
+  { id:'k1', ico:'🍜', name:'ขนมจีนน้ำเงี้ยว',  sub:'1 ถ้วย/ถุง',   sell:60, cost:42.33, cat:'khanom'  },
+];
+
+// ── State ─────────────────────────────────────────────────────────────
+let barC, pieC, weekC;
+
+// ── Init ──────────────────────────────────────────────────────────────
+window.onload = () => {
+  const today = new Date().toISOString().slice(0,10);
+  document.getElementById('dateInput').value = today;
+  onDate(today);
+  buildCards();
+  initCharts();
+  renderHist();
+  renderOrders();
+  initOrderSync();
+};
+
+// ── Date ──────────────────────────────────────────────────────────────
+function pickDate(){
+  const inp = document.getElementById('dateInput');
+  if(inp.showPicker) inp.showPicker(); else inp.click();
+}
+function onDate(v){
+  if(!v) return;
+  const [y,m,d] = v.split('-');
+  const mn = ['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.',
+              'ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+  document.getElementById('ddisp').textContent = `${+d} ${mn[+m]} ${+y+543}`;
+}
+
+// ── Build cards ────────────────────────────────────────────────────────
+function buildCards(){
+  const cf = document.getElementById('croffle-cards');
+  const kn = document.getElementById('khanom-cards');
+  cf.innerHTML = ''; kn.innerHTML = '';
+  MENUS.forEach(m => {
+    const pct = ((m.sell - m.cost) / m.sell * 100).toFixed(0);
+    const html = `
+      <div class="mcard">
+        <div class="mico">${m.ico}</div>
+        <div class="minfo">
+          <div class="mname">${m.name}</div>
+          <div style="font-size:.72rem;color:#999;margin-top:1px">${m.sub}</div>
+          <div class="mtags">
+            <span class="tag tag-g">ขาย ฿${m.sell}</span>
+            <span class="tag tag-r">ทุน ฿${m.cost.toFixed(2)}</span>
+            <span class="tag tag-b" id="ptag-${m.id}">กำไร ฿0</span>
+          </div>
+        </div>
+        <div class="qctrl">
+          <button class="qbtn" onclick="chg('${m.id}',-1)">−</button>
+          <input  class="qnum" type="number" id="q-${m.id}" value="0" min="0"
+                  inputmode="numeric" pattern="[0-9]*" oninput="calc()">
+          <button class="qbtn" onclick="chg('${m.id}',+1)">+</button>
+        </div>
+      </div>`;
+    (m.cat === 'croffle' ? cf : kn).insertAdjacentHTML('beforeend', html);
+  });
+  calc();
+}
+
+function chg(id, delta){
+  const el = document.getElementById('q-'+id);
+  el.value = Math.max(0, (+el.value||0) + delta);
+  calc();
+}
+
+// ── Calculate ─────────────────────────────────────────────────────────
+function calc(){
+  let totR=0, totC=0, totG=0, totB=0;
+  MENUS.forEach(m => {
+    const q = +document.getElementById('q-'+m.id).value||0;
+    const r = m.sell*q, c = m.cost*q, g = r-c;
+    totR+=r; totC+=c; totG+=g; totB+=q;
+    document.getElementById('ptag-'+m.id).textContent = 'กำไร ฿'+g.toFixed(2);
+  });
+  const pct = totR > 0 ? totG/totR*100 : 0;
+
+  // Strip
+  document.getElementById('t-r').textContent = '฿'+fmtK(totR);
+  document.getElementById('t-c').textContent = '฿'+fmtK(totC);
+  document.getElementById('t-g').textContent = '฿'+fmtK(totG);
+
+  // KPIs
+  document.getElementById('k-r').textContent = '฿'+fmt(totR);
+  document.getElementById('k-c').textContent = '฿'+fmt(totC);
+  document.getElementById('k-g').textContent = '฿'+fmt(totG);
+  document.getElementById('k-p').textContent = pct.toFixed(1)+'%';
+  document.getElementById('k-b').textContent = totB;
+
+  // Breakdown
+  const bd = document.getElementById('breakdown');
+  bd.innerHTML = MENUS.map(m => {
+    const q = +document.getElementById('q-'+m.id).value||0;
+    const r = m.sell*q, g = r - m.cost*q;
+    const p = r > 0 ? g/r*100 : 0;
+    const pc = p>=55 ? 'var(--g)' : p>=35 ? 'var(--med)' : 'var(--r)';
+    return `<div class="brow">
+      <div class="bname">${m.ico} ${m.name}</div>
+      <div class="bqty">${q}</div>
+      <div class="bgp">฿${g.toFixed(0)}</div>
+      <div class="bpct" style="color:${pc}">${r>0?p.toFixed(0)+'%':'—'}</div>
+    </div>`;
+  }).join('');
+
+  updCharts(totR, totC, totG);
+}
+
+function fmt(n)  { return n.toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function fmtK(n) { return n>=10000 ? (n/1000).toFixed(1)+'K' : n>=1000 ? (n/1000).toFixed(1)+'K' : n.toFixed(0); }
+
+// ── Charts ─────────────────────────────────────────────────────────────
+function initCharts(){
+  barC = new Chart(document.getElementById('barChart'),{
+    type:'bar',
+    data:{
+      labels: MENUS.map(m=>m.name),
+      datasets:[
+        {label:'รายรับ', data:MENUS.map(()=>0), backgroundColor:'#4472C4CC'},
+        {label:'ต้นทุน', data:MENUS.map(()=>0), backgroundColor:'#ED7D31CC'},
+        {label:'กำไร',  data:MENUS.map(()=>0), backgroundColor:'#70AD47CC'},
+      ]
+    },
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{position:'bottom',labels:{font:{size:10},boxWidth:12}}},
+      scales:{x:{grid:{display:false},ticks:{font:{size:9}}},
+              y:{beginAtZero:true,ticks:{callback:v=>'฿'+v,font:{size:9}}}}}
+  });
+
+  pieC = new Chart(document.getElementById('pieChart'),{
+    type:'doughnut',
+    data:{
+      labels: MENUS.map(m=>m.ico+' '+m.name),
+      datasets:[{data:MENUS.map(()=>1),
+        backgroundColor:['#4472C4','#ED7D31','#70AD47','#F5A623','#00695C'],
+        borderWidth:2,borderColor:'#fff'}]
+    },
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{position:'bottom',labels:{font:{size:10},boxWidth:12}},
+               tooltip:{callbacks:{label:c=>' ฿'+c.parsed.toFixed(2)}}}}
+  });
+
+  weekC = new Chart(document.getElementById('weekChart'),{
+    type:'bar',
+    data:{labels:[],datasets:[
+      {label:'รายรับ', data:[], backgroundColor:'#F5A62399', borderRadius:5},
+      {label:'กำไร',  data:[], backgroundColor:'#70AD4799', borderRadius:5},
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{position:'bottom',labels:{font:{size:10},boxWidth:12}}},
+      scales:{x:{grid:{display:false},ticks:{font:{size:10}}},
+              y:{beginAtZero:true,ticks:{callback:v=>'฿'+v,font:{size:9}}}}}
+  });
+}
+
+function updCharts(totR, totC, totG){
+  const revs=[], costs=[], profits=[];
+  MENUS.forEach(m=>{
+    const q=+document.getElementById('q-'+m.id).value||0;
+    revs.push(m.sell*q); costs.push(m.cost*q); profits.push((m.sell-m.cost)*q);
+  });
+  barC.data.datasets[0].data=revs;
+  barC.data.datasets[1].data=costs;
+  barC.data.datasets[2].data=profits;
+  barC.update('none');
+
+  const hasPr = profits.some(p=>p>0);
+  pieC.data.datasets[0].data = hasPr ? profits.map(p=>Math.max(p,0)) : MENUS.map(()=>1);
+  pieC.update('none');
+}
+
+function updWeekChart(){
+  const hist = getHist();
+  const last7 = hist.slice(0,7).reverse();
+  weekC.data.labels = last7.map(h=>{
+    const [,m,d] = h.date.split('-'); return `${+d}/${+m}`;
+  });
+  weekC.data.datasets[0].data = last7.map(h=>h.totRev);
+  weekC.data.datasets[1].data = last7.map(h=>h.totGp);
+  weekC.update('none');
+}
+
+// ── Tab ───────────────────────────────────────────────────────────────
+function tab(t){
+  ['sales','summary','hist','orders'].forEach(x=>{
+    document.getElementById('sc-'+x).classList.toggle('active',x===t);
+    document.getElementById('nb-'+x).classList.toggle('active',x===t);
+  });
+  if(t==='hist'){ renderHist(); updWeekChart(); }
+  if(t==='orders'){ renderOrders(); }
+}
+
+// ── Save / Clear ──────────────────────────────────────────────────────
+function getHist(){ return JSON.parse(localStorage.getItem('crHist')||'[]'); }
+function saveHist(h){ localStorage.setItem('crHist',JSON.stringify(h)); }
+
+function saveDay(){
+  const date = document.getElementById('dateInput').value;
+  if(!date){ toast('⚠️ เลือกวันที่ก่อน'); return; }
+  const rows = MENUS.map(m=>({
+    id:m.id, name:m.name, ico:m.ico, sub:m.sub,
+    sell:m.sell, cost:m.cost,
+    qty: +document.getElementById('q-'+m.id).value||0
+  }));
+  const totBox = rows.reduce((s,r)=>s+r.qty,0);
+  if(!totBox){ toast('⚠️ กรอกจำนวนก่อนบันทึก'); return; }
+  const totRev = rows.reduce((s,r)=>s+r.sell*r.qty,0);
+  const totCost= rows.reduce((s,r)=>s+r.cost*r.qty,0);
+  const totGp  = totRev - totCost;
+
+  const hist = getHist();
+  const idx  = hist.findIndex(h=>h.date===date);
+  const entry= {date, rows, totBox, totRev, totCost, totGp};
+  if(idx>=0) hist[idx]=entry; else hist.unshift(entry);
+  hist.sort((a,b)=>b.date.localeCompare(a.date));
+  saveHist(hist);
+  toast('✅ บันทึกแล้ว!');
+  renderHist();
+}
+
+function clearDay(){
+  if(!confirm('ล้างข้อมูลวันนี้?')) return;
+  MENUS.forEach(m=>{ document.getElementById('q-'+m.id).value=0; });
+  calc(); toast('🗑️ ล้างแล้ว');
+}
+function clearHist(){
+  if(!confirm('ลบประวัติทั้งหมด?')) return;
+  localStorage.removeItem('crHist');
+  renderHist(); updWeekChart(); toast('🗑️ ลบแล้ว');
+}
+function deleteEntry(date){
+  let h=getHist().filter(x=>x.date!==date);
+  saveHist(h); renderHist(); updWeekChart(); toast('🗑️ ลบแล้ว');
+}
+
+// ── Render history ────────────────────────────────────────────────────
+function renderHist(){
+  const hist = getHist();
+  const totD = hist.length;
+  const totR = hist.reduce((s,h)=>s+h.totRev,0);
+  const totG = hist.reduce((s,h)=>s+h.totGp,0);
+
+  document.getElementById('hs-d').textContent = totD;
+  document.getElementById('hs-r').textContent = '฿'+fmtK(totR);
+  document.getElementById('hs-g').textContent = '฿'+fmtK(totG);
+
+  const list = document.getElementById('hist-list');
+  if(!hist.length){
+    list.innerHTML = `<div class="empty">📭 ยังไม่มีข้อมูล<br>กลับไปกรอกยอดขายแล้วกด<br>"บันทึกวันนี้" ได้เลยครับ</div>`;
+    return;
+  }
+  list.innerHTML = hist.map(h=>{
+    const pct = h.totRev>0 ? h.totGp/h.totRev*100 : 0;
+    const pc  = pct>=40?'var(--g)':pct>=20?'var(--med)':'var(--r)';
+    return `<div class="hentry" onclick="showDetail('${h.date}')">
+      <div class="hedate">
+        <div class="heday">${fdate(h.date)}</div>
+        <div class="hebox">${h.totBox} กล่อง/ถ้วย</div>
+      </div>
+      <div class="henums">
+        <div class="herev">รายรับ ฿${fmt(h.totRev)}</div>
+        <div class="hegp">+฿${fmt(h.totGp)}</div>
+        <div class="hepct" style="color:${pc}">${pct.toFixed(1)}%</div>
+      </div>
+      <button class="hdel" onclick="event.stopPropagation();deleteEntry('${h.date}')">🗑️</button>
+    </div>`;
+  }).join('');
+}
+
+// ── Detail modal ──────────────────────────────────────────────────────
+function showDetail(date){
+  const h = getHist().find(x=>x.date===date);
+  if(!h) return;
+  const pct = h.totRev>0 ? h.totGp/h.totRev*100 : 0;
+  const rows = h.rows.map(r=>{
+    const rev=r.sell*r.qty, gp=rev-r.cost*r.qty, p=rev>0?gp/rev*100:0;
+    return r.qty>0 ? `<div class="dtrow">
+      <div class="dtname">${r.ico} ${r.name}<br><span style="font-size:.7rem;color:#aaa">${r.sub}</span></div>
+      <div class="dtnums">${r.qty} × ฿${r.sell}<br>
+        <span style="color:var(--g);font-weight:700">กำไร ฿${gp.toFixed(2)}</span>
+        <span style="color:#999;font-size:.72rem"> (${p.toFixed(0)}%)</span>
+      </div>
+    </div>` : '';
+  }).filter(Boolean).join('');
+
+  document.getElementById('modal-body').innerHTML = `
+    <div class="modal-title">
+      <span>📋 ${fdate(date)}</span>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    ${rows}
+    <div style="margin-top:14px;padding:14px;background:var(--hdr);border-radius:12px;text-align:center">
+      <div style="color:rgba(255,255,255,.6);font-size:.78rem;margin-bottom:4px">กำไรสุทธิ</div>
+      <div style="color:var(--amber);font-size:1.6rem;font-weight:800">฿${fmt(h.totGp)}</div>
+      <div style="color:#81C784;font-size:.9rem;margin-top:2px">${pct.toFixed(1)}% ของรายรับ</div>
+    </div>`;
+  document.getElementById('modal-bg').classList.add('show');
+}
+function closeModal(e){
+  if(!e || e.target===document.getElementById('modal-bg'))
+    document.getElementById('modal-bg').classList.remove('show');
+}
+
+// ── Export CSV ────────────────────────────────────────────────────────
+function exportCSV(){
+  const hist = getHist();
+  if(!hist.length){ toast('⚠️ ไม่มีข้อมูล'); return; }
+  let csv = 'วันที่,เมนู,จำนวน,รายรับ,ต้นทุน,กำไร,กำไร%\n';
+  hist.forEach(h=>{
+    h.rows.forEach(r=>{
+      if(!r.qty) return;
+      const rev=r.sell*r.qty, tc=r.cost*r.qty, gp=rev-tc;
+      const pct=rev>0?gp/rev*100:0;
+      csv+=`${h.date},"${r.name}",${r.qty},${rev.toFixed(2)},${tc.toFixed(2)},${gp.toFixed(2)},${pct.toFixed(1)}%\n`;
+    });
+    const tp=h.totRev>0?h.totGp/h.totRev*100:0;
+    csv+=`${h.date},"รวม",${h.totBox},${h.totRev.toFixed(2)},${h.totCost.toFixed(2)},${h.totGp.toFixed(2)},${tp.toFixed(1)}%\n\n`;
+  });
+  const a=document.createElement('a');
+  a.href='data:text/csv;charset=utf-8,﻿'+encodeURIComponent(csv);
+  a.download='Croffle_ยอดขาย.csv'; a.click();
+  toast('📤 Export แล้ว!');
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────
+function fdate(s){
+  const [y,m,d]=s.split('-');
+  const mn=['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.',
+            'ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+  const days=['อา.','จ.','อ.','พ.','พฤ.','ศ.','ส.'];
+  const day=days[new Date(s).getDay()];
+  return `${day} ${+d} ${mn[+m]} ${+y+543}`;
+}
+
+let toastT;
+function toast(msg){
+  clearTimeout(toastT);
+  const el=document.getElementById('toast');
+  el.textContent=msg; el.classList.add('show');
+  toastT=setTimeout(()=>el.classList.remove('show'),2600);
+}
+
+// ── Order Management ──────────────────────────────────────────────────
+// crPendingOrders  = ออเดอร์รอรับ  (จาก Order.html)
+// crAcceptedOrders = ออเดอร์รับแล้ว (เก็บไว้ดูรายการ ไม่มีปุ่ม)
+
+function getPending()  { return JSON.parse(localStorage.getItem('crPendingOrders') ||'[]'); }
+function savePending(a){ localStorage.setItem('crPendingOrders', JSON.stringify(a)); }
+function getAccepted() { return JSON.parse(localStorage.getItem('crAcceptedOrders')||'[]'); }
+function saveAccepted(a){ localStorage.setItem('crAcceptedOrders',JSON.stringify(a)); }
+
+function updBadge(){
+  const n = getPending().length;
+  const b = document.getElementById('ord-badge');
+  b.textContent = n;
+  b.style.display = n > 0 ? 'inline-block' : 'none';
+  n > 0 ? b.classList.add('ord-pulse') : b.classList.remove('ord-pulse');
+}
+
+function renderOrders(){
+  updBadge();
+  const sc = document.getElementById('sc-orders');
+  if(!sc.classList.contains('active')) return;
+
+  const pending  = getPending();
+  const accepted = getAccepted();
+  const list = document.getElementById('orders-list');
+
+  if(!pending.length && !accepted.length){
+    list.innerHTML = `<div class="empty">📭 ยังไม่มีออเดอร์<br>รอลูกค้าสั่งผ่านหน้า Order ได้เลย 😊</div>`;
+    return;
+  }
+
+  let html = '';
+
+  // ── รอรับ ──
+  if(pending.length){
+    html += `<div class="ord-section-hdr ord-pending">⏳ รอรับ (${pending.length})</div>`;
+    html += pending.map(ord => buildOrderCard(ord, false)).join('');
+  }
+
+  // ── รับแล้ว ──
+  if(accepted.length){
+    html += `<div class="ord-section-hdr ord-accepted" style="margin-top:14px">
+      <span>✅ รับแล้ว (${accepted.length})</span>
+      <button class="ord-clr-btn" onclick="clearAccepted()">ล้าง</button>
+    </div>`;
+    html += accepted.map(ord => buildOrderCard(ord, true)).join('');
+  }
+
+  list.innerHTML = html;
+}
+
+function buildOrderCard(ord, isDone){
+  const items = ord.items.map(it=>`
+    <div class="oitem-row">
+      <div class="oitem-nm">${it.ico} ${it.name}</div>
+      <div class="oitem-q">×${it.qty}</div>
+      <div class="oitem-pr">฿${(it.sell*it.qty).toFixed(0)}</div>
+    </div>`).join('');
+  const totQty = ord.items.reduce((s,i)=>s+i.qty, 0);
+  const timeLbl = ord.acceptedAt
+    ? `รับเวลา ${ord.acceptedAt}` : (ord.time||'');
+
+  const statusBadge = isDone
+    ? `<div class="ord-badge-done">✅ รับแล้ว ${ord.acceptedAt||''}</div>`
+    : `<div class="ord-badge-wait">⏳ รอรับ</div>`;
+
+  const buttons = isDone ? '' : `
+    <div class="ocard-btns">
+      <button class="obtn obtn-acc" onclick="acceptOrder('${ord.id}')">✅ รับออเดอร์</button>
+      <button class="obtn obtn-rej" onclick="cancelOrder('${ord.id}')">❌ ยกเลิก</button>
+    </div>`;
+
+  return `
+  <div class="ocard" style="${isDone?'opacity:.72':''}">
+    <div class="ocard-hdr">
+      <div>
+        <div class="ocust">👤 ${ord.customerName||'ไม่ระบุชื่อ'}</div>
+        <div class="otime">🕐 ${timeLbl}</div>
+      </div>
+      ${statusBadge}
+    </div>
+    <div>${items}</div>
+    <div class="ocard-total">
+      <div class="ocard-total-lbl">${totQty} รายการ</div>
+      <div class="ocard-total-val">฿${(ord.totRev||0).toFixed(0)}</div>
+    </div>
+    ${buttons}
+  </div>`;
+}
+
+function acceptOrder(id){
+  const pending = getPending();
+  const ord = pending.find(o => o.id === id);
+  if(!ord) return;
+
+  // บวกจำนวนเข้า input กรอกยอดขาย
+  ord.items.forEach(it=>{
+    const el = document.getElementById('q-'+it.id);
+    if(el) el.value = (+el.value||0) + it.qty;
+  });
+  calc();
+
+  // ย้ายออเดอร์จาก pending → accepted
+  const now = new Date().toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'});
+  const accepted = getAccepted();
+  accepted.unshift({...ord, acceptedAt: now});
+  saveAccepted(accepted);
+  savePending(pending.filter(o => o.id !== id));
+
+  // Re-render ที่หน้าออเดอร์เดิม (ไม่ redirect)
+  renderOrders();
+  toast('✅ รับออเดอร์ '+(ord.customerName||'')+' แล้ว!');
+}
+
+function cancelOrder(id){
+  const ord = getPending().find(o => o.id === id);
+  const name = ord ? (ord.customerName||'') : '';
+  if(!confirm('ยืนยันยกเลิกออเดอร์'+(name?' ของ '+name:'')+'?')) return;
+  savePending(getPending().filter(o => o.id !== id));
+  renderOrders();
+  toast('❌ ยกเลิกออเดอร์แล้ว');
+}
+
+function clearAccepted(){
+  localStorage.removeItem('crAcceptedOrders');
+  renderOrders();
+  toast('🗑️ ล้างรายการที่รับแล้ว');
+}
+
+// ── Sync listener (BroadcastChannel + storage event + polling) ─────────
+function initOrderSync(){
+  try{
+    const ch = new BroadcastChannel('croffle_orders');
+    ch.onmessage = ()=>{ updBadge(); renderOrders(); };
+  }catch(e){}
+
+  window.addEventListener('storage', e=>{
+    if(e.key==='crPendingOrders'||e.key==='crAcceptedOrders'){
+      updBadge(); renderOrders();
+    }
+  });
+
+  setInterval(()=>{ updBadge(); renderOrders(); }, 3000);
+}
+</script>
+</body>
+</html>

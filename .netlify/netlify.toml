@@ -1,0 +1,41 @@
+functionsDirectory = "C:\\Claude AI\\Food Delivery\\Croffle\\netlify\\functions"
+functionsDirectoryOrigin = "config"
+redirectsOrigin = "config"
+plugins = []
+headers = []
+
+[build]
+publish = "C:\\Claude AI\\Food Delivery\\Croffle"
+publishOrigin = "default"
+functions = "C:\\Claude AI\\Food Delivery\\Croffle\\netlify\\functions"
+
+[build.environment]
+
+[build.processing]
+
+[build.processing.css]
+
+[build.processing.html]
+
+[build.processing.images]
+
+[build.processing.js]
+
+[build.services]
+
+[functions]
+
+[functions."*"]
+node_bundler = "esbuild"
+
+[[redirects]]
+from = "/Croffle.html"
+to = "/Croffle.html"
+status = 200.0
+force = false
+
+[redirects.query]
+
+[redirects.conditions]
+
+[redirects.headers]
