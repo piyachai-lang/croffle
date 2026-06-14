@@ -2326,7 +2326,7 @@ function tab(t) {
       loadSummaryDate(summaryDateStr);
     }
   }
-  if (t === 'hist')    { syncCrHistFromCache(); renderHist(); updWeekChart(); }
+  if (t === 'hist')    { loadOrderHistory(); syncCrHistFromCache(); renderHist(); if(typeof updWeekChart==='function') updWeekChart(); }
   if (t === 'settings') { renderMenuSettings(); }
   if (t === 'orders') {
     loadOrderHistory(); // refresh from Firebase+localStorage
@@ -3623,7 +3623,7 @@ function autoSaveDay() {
 window.onload = () => {
   // ── App version check: ล้าง localStorage เก่าเมื่อ code อัปเดต ──────────
   // เปลี่ยน APP_VERSION ทุกครั้งที่ราคา default ในโค้ดเปลี่ยน
-  var APP_VERSION = 'v20260606-b';
+  var APP_VERSION = 'v20260606-c';
   var el = document.getElementById('dbg-ver');
   if (el) el.textContent = APP_VERSION;
   // ล้าง crMenuCustom เก่าออกทุกครั้งที่ version เปลี่ยน
