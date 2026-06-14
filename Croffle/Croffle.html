@@ -3623,7 +3623,7 @@ function autoSaveDay() {
 window.onload = () => {
   // ── App version check: ล้าง localStorage เก่าเมื่อ code อัปเดต ──────────
   // เปลี่ยน APP_VERSION ทุกครั้งที่ราคา default ในโค้ดเปลี่ยน
-  var APP_VERSION = 'v20260606-a';
+  var APP_VERSION = 'v20260606-b';
   var el = document.getElementById('dbg-ver');
   if (el) el.textContent = APP_VERSION;
   // ล้าง crMenuCustom เก่าออกทุกครั้งที่ version เปลี่ยน
@@ -4176,6 +4176,8 @@ function updateHistFromOrders(dateStr) {
 // เรียกหลัง loadOrderHistory เสร็จ เพื่อให้แท็บประวัติเห็นข้อมูลจาก Firebase
 function syncCrHistFromCache() {
   // วันที่มี real orders อยู่ใน cache
+  // ป้องกัน: ถ้า orderHistoryCache ยังว่าง (Firebase ยังไม่โหลด) ไม่ล้าง crHist
+  if (Object.keys(orderHistoryCache).length === 0) return;
   const activeDates = new Set();
   Object.values(orderHistoryCache).forEach(function(o) {
     if (o && !o.isSummary && o.date) activeDates.add(o.date.slice(0,10));
