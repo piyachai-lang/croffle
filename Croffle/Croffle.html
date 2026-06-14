@@ -1311,13 +1311,25 @@ function initFirebase() {
     db.ref('croffle/accepted').on('value', snap => {
       const data = snap.val() || {};
       // ✅ FIX: ใช้ Object.entries เพื่อ inject Firebase key เป็น id fallback เสมอ
-      acceptedCache = Object.entries(data)
+      var _fbAccArr = Object.entries(data)
         .map(([key, val]) => {
           if (!val || typeof val !== 'object') return null;
           return {...val, id: val.id || key};
         })
-        .filter(Boolean)
-        .sort((a,b) => (b.acceptedTs||0) - (a.acceptedTs||0));
+        .filter(Boolean);
+      // ✅ Merge จาก localStorage ถ้า Firebase ส่งกลับมาว่าง
+      // (กรณี Firebase ข้อมูลหายหรือ network issue — "ล้าง" จะ clear LS ด้วยอยู่แล้ว)
+      if (_fbAccArr.length === 0) {
+        try {
+          var _lsAcc = JSON.parse(localStorage.getItem('crAcceptedOrders') || '[]');
+          if (_lsAcc.length > 0) {
+            _fbAccArr = _lsAcc;
+            // recover ขึ้น Firebase
+            _lsAcc.forEach(function(o) { if (o && o.id && db) db.ref('croffle/accepted/' + o.id).set(o); });
+          }
+        } catch(e) {}
+      }
+      acceptedCache = _fbAccArr.sort((a,b) => (b.acceptedTs||0) - (a.acceptedTs||0));
       // บันทึก history ถาวรทุกครั้งที่ accepted orders อัปเดต
       acceptedCache.forEach(o => { if (o && o.id) saveOrderHistory(o); });
       renderOrders();
@@ -1335,12 +1347,23 @@ function initFirebase() {
       Object.keys(fbHist).forEach(function(k) {
         if (fbHist[k] && typeof fbHist[k] === 'object') newCache[k] = fbHist[k];
       });
+      // ✅ Merge localStorage entries ที่ไม่มีใน Firebase กลับเข้ามา
+      // (กรณีบันทึกขณะ offline หรือ Firebase push ล้มเหลว) แล้ว push ขึ้น Firebase ด้วย
+      try {
+        var _lsOld = JSON.parse(localStorage.getItem('crOrderHistory') || '{}');
+        Object.keys(_lsOld).forEach(function(k) {
+          if (!newCache[k] && _lsOld[k] && typeof _lsOld[k] === 'object' && !_lsOld[k].isSummary) {
+            newCache[k] = _lsOld[k];
+            if (db) db.ref('croffle/orderHistory/' + k).set(_lsOld[k]); // recover to Firebase
+          }
+        });
+      } catch(e) {}
       // เก็บ accepted orders ที่ยังอยู่ใน acceptedCache ด้วย (pending delivery)
       acceptedCache.forEach(function(o) { if (o && o.id) newCache[o.id] = o; });
       // ✅ สร้าง synthetic entries ใหม่สดจาก crHist สำหรับวันที่ไม่มี real orders
       importHistSummaries(newCache);
       orderHistoryCache = newCache;
-      // ซิงค์ localStorage ให้ตรงกับ Firebase (ลบ order ที่ถูกลบออก)
+      // ซิงค์ localStorage ให้ตรงกับ Firebase
       localStorage.setItem('crOrderHistory', JSON.stringify(newCache));
       // recalculate crHist ทุกวัน
       syncCrHistFromCache();
@@ -3694,7 +3717,7 @@ function autoSaveDay() {
 window.onload = () => {
   // ── App version check: ล้าง localStorage เก่าเมื่อ code อัปเดต ──────────
   // เปลี่ยน APP_VERSION ทุกครั้งที่ราคา default ในโค้ดเปลี่ยน
-  var APP_VERSION = 'v20260614-e';
+  var APP_VERSION = 'v20260614-f';
   var el = document.getElementById('dbg-ver');
   if (el) el.textContent = APP_VERSION;
   // ล้าง crMenuCustom เก่าออกทุกครั้งที่ version เปลี่ยน
