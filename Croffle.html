@@ -3717,7 +3717,7 @@ function autoSaveDay() {
 window.onload = () => {
   // ── App version check: ล้าง localStorage เก่าเมื่อ code อัปเดต ──────────
   // เปลี่ยน APP_VERSION ทุกครั้งที่ราคา default ในโค้ดเปลี่ยน
-  var APP_VERSION = 'v20260614-f';
+  var APP_VERSION = 'v20260614-g';
   var el = document.getElementById('dbg-ver');
   if (el) el.textContent = APP_VERSION;
   // ล้าง crMenuCustom เก่าออกทุกครั้งที่ version เปลี่ยน
@@ -4276,19 +4276,8 @@ function syncCrHistFromCache() {
   Object.values(orderHistoryCache).forEach(function(o) {
     if (o && !o.isSummary && o.date) activeDates.add(o.date.slice(0,10));
   });
-  // recalculate crHist สำหรับวันที่ยังมี orders
+  // recalculate crHist สำหรับวันที่ยังมี orders (additive only — ไม่ลบ)
   activeDates.forEach(function(d) { updateHistFromOrders(d); });
-
-  // ✅ ลบ crHist entry ที่เป็น fromOrders:true แต่ไม่มี order ใน cache แล้ว
-  // (เกิดเมื่อ order ถูกลบบนเครื่องอื่น แล้ว real-time listener sync มา)
-  var hist = getHist();
-  var cleaned = hist.filter(function(h) {
-    if (h.fromOrders === false) return true; // manual saveDay — ไม่แตะ
-    return activeDates.has(h.date); // fromOrders:true — เก็บเฉพาะวันที่มี order จริง
-  });
-  if (cleaned.length !== hist.length) {
-    saveHist(cleaned); // บันทึกเฉพาะเมื่อมีการเปลี่ยนแปลง
-  }
 
   if (document.getElementById('sc-hist') &&
       document.getElementById('sc-hist').classList.contains('active')) {
