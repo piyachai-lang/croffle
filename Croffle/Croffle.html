@@ -2414,18 +2414,32 @@ function deleteEntry(date) {
 }
 var _histFetchPending = false; // ป้องกัน Firebase fetch วนซ้ำ
 function renderHist() {
-  // ① cache ว่าง + Firebase พร้อม + ยังไม่ได้ fetch → ดึงข้อมูลจาก Firebase
+  // ① ถ้า cache ว่าง → ลอง restore จาก localStorage ที่ Firebase เคย save ไว้
+  if (Object.keys(orderHistoryCache).length === 0) {
+    try {
+      var _lsCache = JSON.parse(localStorage.getItem('crOrderHistory') || '{}');
+      var _lsKeys = Object.keys(_lsCache);
+      if (_lsKeys.length > 0) {
+        _lsKeys.forEach(function(k) { if (_lsCache[k] && typeof _lsCache[k] === 'object') orderHistoryCache[k] = _lsCache[k]; });
+      }
+    } catch(e) {}
+  }
+  // ② cache ยังว่าง + Firebase พร้อม → fetch จาก Firebase พร้อม timeout 5 วินาที
   if (Object.keys(orderHistoryCache).length === 0 && fbReady && db && !_histFetchPending) {
     _histFetchPending = true;
     var _hl = document.getElementById('hist-list');
     if (_hl) _hl.innerHTML = '<div class="empty">⏳ กำลังโหลดข้อมูล...</div>';
+    var _fetchTO = setTimeout(function() {
+      if (_histFetchPending) { _histFetchPending = false; _renderHistData(); }
+    }, 5000);
     db.ref('croffle/orderHistory').once('value', function(snap) {
+      clearTimeout(_fetchTO);
       _histFetchPending = false;
       var _fh = (snap && snap.val()) || {};
       Object.keys(_fh).forEach(function(k) {
         if (_fh[k] && typeof _fh[k] === 'object') orderHistoryCache[k] = _fh[k];
       });
-      _renderHistData(); // render หลัง fetch (ไม่เรียก renderHist() ตรงๆ เพื่อกัน loop)
+      _renderHistData();
     });
     return;
   }
@@ -3680,7 +3694,7 @@ function autoSaveDay() {
 window.onload = () => {
   // ── App version check: ล้าง localStorage เก่าเมื่อ code อัปเดต ──────────
   // เปลี่ยน APP_VERSION ทุกครั้งที่ราคา default ในโค้ดเปลี่ยน
-  var APP_VERSION = 'v20260614-d';
+  var APP_VERSION = 'v20260614-e';
   var el = document.getElementById('dbg-ver');
   if (el) el.textContent = APP_VERSION;
   // ล้าง crMenuCustom เก่าออกทุกครั้งที่ version เปลี่ยน
