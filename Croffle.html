@@ -1332,30 +1332,16 @@ function initFirebase() {
     // ── OrderHistory (real-time) — ทุกเครื่องรู้ทันทีเมื่อ order ถูกเพิ่ม/ลบ/แก้ไข ──
     db.ref('croffle/orderHistory').on('value', function(snap) {
       const fbHist = (snap && snap.val()) || {};
-      // Firebase คือ source of truth — สร้าง cache ใหม่จาก Firebase ล้วนๆ
-      const newCache = {};
+      // MERGE Firebase data เข้า orderHistoryCache (Firebase wins on conflict)
+      // ไม่ replace ทั้ง cache เพื่อป้องกันข้อมูลที่ accepted listener เพิ่งเพิ่มหาย
       Object.keys(fbHist).forEach(function(k) {
-        if (fbHist[k] && typeof fbHist[k] === 'object') newCache[k] = fbHist[k];
+        if (fbHist[k] && typeof fbHist[k] === 'object') orderHistoryCache[k] = fbHist[k];
       });
-      // ✅ Merge localStorage entries ที่ไม่มีใน Firebase กลับเข้ามา
-      // (กรณีบันทึกขณะ offline หรือ Firebase push ล้มเหลว) แล้ว push ขึ้น Firebase ด้วย
-      try {
-        var _lsOld = JSON.parse(localStorage.getItem('crOrderHistory') || '{}');
-        Object.keys(_lsOld).forEach(function(k) {
-          if (!newCache[k] && _lsOld[k] && typeof _lsOld[k] === 'object' && !_lsOld[k].isSummary) {
-            newCache[k] = _lsOld[k];
-            if (db) db.ref('croffle/orderHistory/' + k).set(_lsOld[k]); // recover to Firebase
-          }
-        });
-      } catch(e) {}
-      // เก็บ accepted orders ที่ยังอยู่ใน acceptedCache ด้วย (pending delivery)
-      acceptedCache.forEach(function(o) { if (o && o.id) newCache[o.id] = o; });
-      // ✅ สร้าง synthetic entries ใหม่สดจาก crHist สำหรับวันที่ไม่มี real orders
-      importHistSummaries(newCache);
-      orderHistoryCache = newCache;
-      // ซิงค์ localStorage ให้ตรงกับ Firebase
-      localStorage.setItem('crOrderHistory', JSON.stringify(newCache));
-      // recalculate crHist ทุกวัน
+      // เก็บ accepted orders ที่ยังอยู่ใน acceptedCache ด้วย (real-time orders)
+      acceptedCache.forEach(function(o) { if (o && o.id && !orderHistoryCache[o.id]) orderHistoryCache[o.id] = o; });
+      // save to localStorage
+      localStorage.setItem('crOrderHistory', JSON.stringify(orderHistoryCache));
+      // recalculate crHist
       syncCrHistFromCache();
       // refresh แท็บที่เปิดอยู่
       var vOwn = document.getElementById('v-own');
@@ -3756,7 +3742,7 @@ function autoSaveDay() {
 window.onload = () => {
   // ── App version check: ล้าง localStorage เก่าเมื่อ code อัปเดต ──────────
   // เปลี่ยน APP_VERSION ทุกครั้งที่ราคา default ในโค้ดเปลี่ยน
-  var APP_VERSION = 'v20260614-h';
+  var APP_VERSION = 'v20260614-i';
   var el = document.getElementById('dbg-ver');
   if (el) el.textContent = APP_VERSION;
   // ล้าง crMenuCustom เก่าออกทุกครั้งที่ version เปลี่ยน
@@ -3896,9 +3882,7 @@ function loadOrderHistory() {
   syncCrHistFromCache();
   renderCalendar();
 
-  // ═══ ASYNC: force-refresh จาก Firebase (source of truth) ═══
-  // real-time listener จะ handle updates โดยอัตโนมัติ
-  // loadOrderHistory() ใช้สำหรับ initial load หรือ manual refresh เท่านั้น
+  // ═══ ASYNC: force-refresh จาก Firebase + MERGE (ไม่ replace) ═══
   if (fbReady && db) {
     Promise.all([
       db.ref('croffle/orderHistory').once('value'),
@@ -3908,24 +3892,30 @@ function loadOrderHistory() {
       const fbHist = (histSnap && histSnap.exists() && histSnap.val()) || {};
       const fbAcc  = (accSnap  && accSnap.exists()  && accSnap.val())  || {};
 
-      // ✅ Firebase wins: สร้าง cache ใหม่จาก Firebase ล้วนๆ (ไม่ merge กับ stale local)
-      const newCache = {};
+      // MERGE Firebase data เข้า orderHistoryCache (Firebase wins) — ไม่ replace ทั้งก้อน
       Object.keys(fbHist).forEach(function(k) {
-        if (fbHist[k] && typeof fbHist[k] === 'object') newCache[k] = fbHist[k];
+        if (fbHist[k] && typeof fbHist[k] === 'object') orderHistoryCache[k] = fbHist[k];
       });
       Object.keys(fbAcc).forEach(function(k) {
-        if (fbAcc[k] && typeof fbAcc[k] === 'object') newCache[k] = fbAcc[k];
+        if (fbAcc[k] && typeof fbAcc[k] === 'object' && !orderHistoryCache[k]) orderHistoryCache[k] = fbAcc[k];
       });
-      // ✅ ไม่ carry-over isSummary entries เก่า — importHistSummaries() สร้างใหม่สดเสมอ
-
-      importHistSummaries(newCache);
-      orderHistoryCache = newCache;
-      // ✅ sync localStorage ให้ตรงกับ Firebase — ลบ order ที่ไม่มีใน Firebase ออก
-      localStorage.setItem('crOrderHistory', JSON.stringify(newCache));
+      localStorage.setItem('crOrderHistory', JSON.stringify(orderHistoryCache));
       localStorage.setItem('crAcceptedOrders', JSON.stringify(acceptedCache));
 
       syncCrHistFromCache();
       renderCalendar();
+
+      // re-render แท็บที่เปิดอยู่หลัง async fetch เสร็จ
+      var vOwn = document.getElementById('v-own');
+      if (!vOwn || vOwn.style.display === 'none') return;
+      var scSum  = document.getElementById('sc-summary');
+      var scHist = document.getElementById('sc-hist');
+      if (scSum && scSum.classList.contains('active')) {
+        if (summaryMode === 'month') loadSummaryMonth(summaryMonthStr);
+        else if (summaryMode === 'week') loadSummaryWeek(summaryWeekStart || summaryDateStr);
+        else loadSummaryDate(summaryDateStr || localDateStr());
+      }
+      if (scHist && scHist.classList.contains('active')) { renderHist(); if(chartsReady) updWeekChart(); }
 
       // migrate accepted → orderHistory (ครั้งเดียว สำหรับข้อมูลเก่า)
       Object.values(fbAcc).forEach(function(o) {
