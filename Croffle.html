@@ -2466,7 +2466,16 @@ function _renderHistData() {
   document.getElementById('hs-r').textContent='฿'+fmt(hist.reduce(function(s,h){return s+h.totRev;},0));
   document.getElementById('hs-g').textContent='฿'+fmt(hist.reduce(function(s,h){return s+h.totGp;},0));
   const list=document.getElementById('hist-list');
-  if(!hist.length){list.innerHTML=`<div class="empty">📭 ยังไม่มีข้อมูล</div>`;return;}
+  if(!hist.length){
+    var _ck=Object.keys(orderHistoryCache);
+    var _s0=_ck.length>0?orderHistoryCache[_ck[0]]:null;
+    var _dbg='FB:'+String(fbReady)+' | cache:'+_ck.length+' | crHist:'+getHist().length;
+    if(_s0) _dbg+=' | id='+(_s0.id||'?')+' date='+(_s0.date||'?')+' isSummary='+String(!!_s0.isSummary);
+    list.innerHTML='<div class="empty">📭 ยังไม่มีข้อมูล</div>'
+      +'<div style="font-size:.68rem;color:#999;padding:8px 12px;background:#f8f8f8;border-radius:8px;margin:8px 0;word-break:break-all">🔍 '+_dbg+'</div>'
+      +'<button onclick="_histFetchPending=false;renderHist()" style="display:block;width:100%;padding:10px;background:var(--ambl);border:none;border-radius:10px;font-size:.85rem;font-weight:700;color:var(--hdr);cursor:pointer;margin-top:4px">🔄 โหลดข้อมูลใหม่</button>';
+    return;
+  }
   list.innerHTML=hist.map(h=>{
     const pct=h.totRev>0?h.totGp/h.totRev*100:0;
     const pc=pct>=40?'var(--g)':pct>=20?'var(--med)':'var(--r)';
@@ -3671,7 +3680,7 @@ function autoSaveDay() {
 window.onload = () => {
   // ── App version check: ล้าง localStorage เก่าเมื่อ code อัปเดต ──────────
   // เปลี่ยน APP_VERSION ทุกครั้งที่ราคา default ในโค้ดเปลี่ยน
-  var APP_VERSION = 'v20260614-c';
+  var APP_VERSION = 'v20260614-d';
   var el = document.getElementById('dbg-ver');
   if (el) el.textContent = APP_VERSION;
   // ล้าง crMenuCustom เก่าออกทุกครั้งที่ version เปลี่ยน
