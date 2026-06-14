@@ -2413,7 +2413,20 @@ function deleteEntry(date) {
   renderHist(); if(chartsReady) updWeekChart(); toast('🗑️ ลบแล้ว');
 }
 function renderHist() {
-  // ✅ Guard: ถ้า crHist ว่างแต่ orderHistoryCache มีข้อมูล → rebuild ก่อน render
+  // ① ถ้า orderHistoryCache ว่าง (Firebase ยังไม่โหลด) → ดึงข้อมูลตรงจาก Firebase แล้ว re-render
+  if (Object.keys(orderHistoryCache).length === 0 && typeof fbReady !== 'undefined' && fbReady && db) {
+    var _hl = document.getElementById('hist-list');
+    if (_hl) _hl.innerHTML = '<div class="empty">⏳ กำลังโหลดข้อมูล...</div>';
+    db.ref('croffle/orderHistory').once('value', function(snap) {
+      var _fh = (snap && snap.val()) || {};
+      Object.keys(_fh).forEach(function(k) {
+        if (_fh[k] && typeof _fh[k] === 'object') orderHistoryCache[k] = _fh[k];
+      });
+      renderHist(); // re-render หลังจากได้ข้อมูล
+    });
+    return;
+  }
+  // ② crHist ว่างแต่ cache มีข้อมูล → rebuild crHist ก่อน render
   if (getHist().length === 0 && Object.keys(orderHistoryCache).length > 0) {
     var _dates = new Set();
     Object.values(orderHistoryCache).forEach(function(o) {
@@ -3631,7 +3644,7 @@ function autoSaveDay() {
 window.onload = () => {
   // ── App version check: ล้าง localStorage เก่าเมื่อ code อัปเดต ──────────
   // เปลี่ยน APP_VERSION ทุกครั้งที่ราคา default ในโค้ดเปลี่ยน
-  var APP_VERSION = 'v20260614-a';
+  var APP_VERSION = 'v20260614-b';
   var el = document.getElementById('dbg-ver');
   if (el) el.textContent = APP_VERSION;
   // ล้าง crMenuCustom เก่าออกทุกครั้งที่ version เปลี่ยน
